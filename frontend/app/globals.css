@@ -1,0 +1,35 @@
+/**
+ * Global Styles
+ * 
+ * WHY: These styles apply to the entire application.
+ * Tailwind's @tailwind directives load all utility classes.
+ * 
+ * WHAT:
+ * - base: resets and basic HTML styles
+ * - components: Tailwind's component classes
+ * - utilities: all utility classes (text-center, flex, etc.)
+ */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Custom global styles */
+* {
+  box-sizing: border-box;
+  padding: 0;
+  margin: 0;
+}
+
+html,
+body {
+  max-width: 100vw;
+  overflow-x: hidden;
+}
+
+/* Ensure canvas can use full viewport */
+#canvas-container {
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+}
+

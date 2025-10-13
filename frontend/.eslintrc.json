@@ -1,0 +1,11 @@
+{
+  "extends": ["next/core-web-vitals"],
+  "rules": {
+    // Customize ESLint rules here
+    // Warn instead of error for unused variables during development
+    "@typescript-eslint/no-unused-vars": "warn",
+    // Allow any type during rapid development (tighten later)
+    "@typescript-eslint/no-explicit-any": "warn"
+  }
+}
+

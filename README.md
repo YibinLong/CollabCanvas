@@ -32,6 +32,12 @@ Figma_Clone/
 │       ├── middleware/   # Request interceptors
 │       └── types/        # TypeScript types
 │
+├── docs/             # All project documentation
+│   ├── architecture/     # System design docs
+│   ├── guides/           # Setup and workflow guides
+│   ├── pr-completions/   # PR completion reports
+│   └── archive/          # Historical documents
+│
 ├── PRD.md            # Product Requirements Document
 ├── TASK_LIST.md      # Development roadmap (39 PRs)
 └── README.md         # This file
@@ -170,6 +176,21 @@ OPENAI_API_KEY=sk-your-key
 ```
 
 **⚠️ Never commit .env files to Git!**
+
+## 📚 Documentation
+
+All project documentation is organized in the [`docs/`](./docs) folder:
+
+- **[Architecture](./docs/architecture/)** - System design and structure
+- **[Guides](./docs/guides/)** - Setup instructions and workflows
+- **[PR Completions](./docs/pr-completions/)** - Completion reports for each PR
+- **[Documentation Standard](./docs/PR_DOCUMENTATION_STANDARD.md)** - How to document PRs
+
+**Key Documents:**
+- [Product Requirements](./PRD.md) - Feature specifications
+- [Task List](./TASK_LIST.md) - Complete development roadmap
+- [Setup Guide](./docs/guides/SETUP_GUIDE.md) - Initial project setup
+- [TDD Workflow](./docs/guides/TDD_WORKFLOW.md) - Testing approach
 
 ## 🎯 Design Philosophy
 

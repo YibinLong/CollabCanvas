@@ -1,214 +1,169 @@
 # PR Documentation Standard
 
-**Purpose:** Keep the root folder clean and documentation organized.
+**Purpose:** High-signal documentation. Be succinct. Avoid fluff.
 
 ---
 
-## 📋 Standard Structure for Each PR
-
-When completing a PR, create documentation in this structure:
+## Structure
 
 ```
 docs/pr-completions/pr#/
-├── PR#_COMPLETION.md              (Required)
-├── PR#_IMPLEMENTATION_SUMMARY.md  (For complex PRs)
-├── PR#_SETUP_GUIDE.md             (If user setup needed)
-├── PR#_QUICK_START.md             (Quick reference)
-└── [Additional guides as needed]
+└── PR#_COMPLETION.md  (Required - keep it short)
 ```
+
+Additional docs **only if critical**:
+- `PR#_SETUP.md` - Only if user must do manual setup
+- `PR#_ISSUES.md` - Only if significant bugs/blockers encountered
 
 ---
 
-## 📝 Required Documentation
+## PR#_COMPLETION.md Template
 
-### 1. PR#_COMPLETION.md (ALWAYS REQUIRED)
+**Keep it under 100 lines unless absolutely necessary.**
 
-**Purpose:** Final report showing the PR is complete and tested.
-
-**Contents:**
-- ✅ Status (Complete/Passing)
-- Test results (all tests passed)
-- What was built (summary)
-- Files created/modified
-- Issues encountered and fixed
-- Verification checklist
-- Next steps
-
-**Template:**
 ```markdown
-# ✅ PR#X: [PR Title] - COMPLETED
+# PR#X: [Title]
 
-**Date:** [Date]
-**Status:** ✅ COMPLETE AND VERIFIED
+**Status:** ✅ Complete | **Date:** [Date]
 
-## 🎉 ALL TESTS PASSED
-[Test results here]
+## Built
+- [Key item 1]
+- [Key item 2]
+- [Key item 3]
 
-## 📊 WHAT WAS BUILT
-[Summary of implementation]
+## Files
+**Core:**
+- path/to/file.ts - [one line description]
 
-## 📁 FILES CREATED/MODIFIED
-[List of files]
+**Config:**
+- path/to/config - [one line description]
 
-## 🐛 ISSUES ENCOUNTERED & FIXED
-[Problems and solutions]
+## Tests
+```
+✅ [Test category] - X passing
+✅ [Test category] - Y passing
+```
 
-## ✅ VERIFICATION CHECKLIST
-- ✅ [Requirement 1]
-- ✅ [Requirement 2]
+## Issues Fixed
+1. **[Problem]** - [Solution in one sentence]
+2. **[Problem]** - [Solution in one sentence]
 
-## 🚀 NEXT STEPS
-Ready for PR#[X+1]
+## Verify
+```bash
+# Command to verify it works
+npm run test
+```
+
+**Expected:** [What success looks like]
+
+## Next
+PR#[X+1]: [Next PR title]
 ```
 
 ---
 
-## 📝 Optional Documentation
+## Implementation Summary (Optional)
 
-### 2. PR#_IMPLEMENTATION_SUMMARY.md
+**Create PR#_IMPLEMENTATION.md ONLY if:**
+- New architecture pattern introduced
+- Complex algorithm needs explanation
+- Non-obvious design decisions made
 
-**When to create:** For complex PRs with significant code or architecture.
+**Max 50 lines.** Focus on WHY, not WHAT.
 
-**Purpose:** Technical deep-dive for developers.
+```markdown
+# PR#X Implementation
 
-**Contents:**
-- Detailed explanation of what was built and WHY
-- Code architecture decisions
-- For beginners: explanations of concepts
-- Technical details
-- Database schemas, API designs, etc.
+## Key Decisions
+1. **[Decision]** - [Why in 1-2 sentences]
+2. **[Decision]** - [Why in 1-2 sentences]
 
----
+## Architecture
+[Diagram or brief explanation if critical]
 
-### 3. PR#_SETUP_GUIDE.md
-
-**When to create:** When user needs to do manual setup (APIs, databases, etc).
-
-**Purpose:** Step-by-step instructions with screenshots/details.
-
-**Contents:**
-- Complete setup instructions
-- Where to get API keys/credentials
-- Configuration steps
-- Troubleshooting section
-- Success criteria
-
----
-
-### 4. PR#_QUICK_START.md
-
-**When to create:** When there's a setup guide but you want a TL;DR version.
-
-**Purpose:** Quick reference for experienced developers.
-
-**Contents:**
-- Essential steps only
-- Commands to run
-- What to configure
-- Success criteria
-
----
-
-### 5. Additional Guides
-
-Examples:
-- `SUPABASE_FIX.md` - Specific troubleshooting guide
-- `WHAT_TO_DO_NOW.md` - Immediate next actions
-- `[FEATURE]_GUIDE.md` - Feature-specific documentation
-
----
-
-## 🚫 What NOT to Put in Root
-
-❌ PR completion reports  
-❌ Implementation summaries  
-❌ Setup guides  
-❌ Quick start guides  
-❌ Troubleshooting guides  
-❌ Feature-specific docs  
-
-**Exception:** Only these stay in root:
-- ✅ README.md (main project readme)
-- ✅ TASK_LIST.md (task tracking)
-- ✅ PRD.md (product requirements)
-
----
-
-## 📂 Where to Put Things
-
-| Document Type | Location |
-|--------------|----------|
-| PR completion docs | `docs/pr-completions/pr#/` |
-| Architecture docs | `docs/architecture/` |
-| General guides | `docs/guides/` |
-| Historical/deprecated | `docs/archive/` |
-
----
-
-## ✅ Checklist for Completing a PR
-
-When you finish a PR:
-
-1. **Create PR folder:**
-   ```bash
-   mkdir -p docs/pr-completions/pr#
-   ```
-
-2. **Create PR#_COMPLETION.md:**
-   - All tests passed
-   - What was built
-   - Files created
-   - Issues fixed
-   - Verification checklist
-   - Next steps
-
-3. **Create additional docs as needed:**
-   - Setup guides for user actions
-   - Implementation summaries for complex code
-   - Quick starts for rapid reference
-
-4. **Update docs/README.md:**
-   - Add PR to navigation list
-
-5. **Update TASK_LIST.md:**
-   - Mark PR as complete
-   - Check off all tasks
-
-6. **Keep root clean:**
-   - No PR-specific files in root
-   - Only essential project docs
-
----
-
-## 🎯 Examples
-
-### Simple PR (No User Setup)
-```
-docs/pr-completions/pr4/
-└── PR4_COMPLETION.md
-```
-
-### Complex PR (With Setup)
-```
-docs/pr-completions/pr2/
-├── PR2_COMPLETION.md
-├── PR2_IMPLEMENTATION_SUMMARY.md
-├── PR2_SETUP_GUIDE.md
-├── PR2_QUICK_START.md
-└── SUPABASE_FIX.md
+## For Beginners
+[Only if introducing new concepts - keep to 3-4 bullet points]
 ```
 
 ---
 
-## 💡 Tips
+## Setup Guide (Optional)
 
-- **Be consistent:** Follow the naming convention exactly
-- **Think of the user:** If they need to DO something, create a setup guide
-- **Separate concerns:** Completion reports ≠ implementation details ≠ setup instructions
-- **Update navigation:** Always update docs/README.md when adding new PR docs
-- **Archive old docs:** Move deprecated content to docs/archive/
+**Create PR#_SETUP.md ONLY if user must:**
+- Create external accounts (Supabase, OpenAI, etc.)
+- Configure API keys
+- Run manual database migrations
+
+**Format:**
+```markdown
+# PR#X Setup
+
+## Required
+1. [Action] - [Why]
+2. [Action] - [Why]
+
+## Commands
+```bash
+[Exact commands to run]
+```
+
+## Verify
+```bash
+[Command to check it worked]
+```
+
+**Expected:** [Success criteria]
+
+## Troubleshooting
+- **Error X:** [Fix]
+- **Error Y:** [Fix]
+```
 
 ---
 
-**Last Updated:** October 13, 2025
+## Rules
+
+### ✅ DO:
+- Be concise - every word must earn its place
+- Use code blocks for commands, not prose
+- List files without redundant descriptions
+- Combine related information
+- Skip obvious explanations
+
+### ❌ DON'T:
+- Write walls of text
+- Repeat information from PRD or TASK_LIST
+- Add motivational fluff (🎉 "Congratulations!")
+- Explain common concepts (what TypeScript is, etc.)
+- Create separate files for minor troubleshooting
+- Add "Tips" or "Best Practices" sections
+- Include version numbers or dates in multiple places
+
+---
+
+## File Locations
+
+| Type | Location |
+|------|----------|
+| PR completions | `docs/pr-completions/pr#/` |
+| Architecture | `docs/architecture/` |
+| Guides | `docs/guides/` |
+| Archive | `docs/archive/` |
+
+**Root folder:** Only `README.md`, `TASK_LIST.md`, `PRD.md`
+
+---
+
+## Checklist
+
+When completing a PR:
+
+1. Create `docs/pr-completions/pr#/PR#_COMPLETION.md`
+2. Update `TASK_LIST.md` - mark PR complete
+3. Update `docs/README.md` - add to navigation
+4. Only add additional docs if truly necessary
+
+---
+
+**Updated:** October 13, 2025
 

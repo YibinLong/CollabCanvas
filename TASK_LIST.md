@@ -1,8 +1,10 @@
 # CollabCanvas Development Task List
 
-This document outlines the complete implementation plan for the Figma clone project, organized into 28 progressive Pull Requests (PRs).
+This document outlines the complete implementation plan for the Figma clone project, organized into 39 progressive Pull Requests (PRs).
 
 **⚠️ TDD APPROACH:** This task list follows Test-Driven Development principles. For each feature, tests are written FIRST, then implementation follows to make tests pass.
+
+**🎯 SIMPLIFIED TESTING:** Tests focus on **core functionality and happy paths only**. We're not aiming for 100% coverage or testing every edge case - just ensuring the main features work correctly.
 
 ---
 
@@ -62,16 +64,13 @@ This document outlines the complete implementation plan for the Figma clone proj
 **TDD Step:** ✍️ WRITE TESTS FIRST
 
 **Tasks:**
-- Write tests for Canvas component rendering with SVG viewport
-- Write tests for pan functionality (mouse drag, keyboard)
-- Write tests for zoom functionality (mouse wheel, trackpad gestures)
-- Write tests for space+drag shortcut to pan
-- Write tests for shape components rendering (Rectangle, Circle, Line, Text)
-- Write tests for toolbar UI interactions
-- Write tests for Zustand store state updates (viewport transform, shapes)
-- Write tests for 60 FPS performance benchmarks
+- Write test: Canvas component renders with SVG element
+- Write test: Pan works with mouse drag
+- Write test: Zoom works with mouse wheel
+- Write test: Basic shapes render (Rectangle, Circle)
+- Write test: Zustand store updates viewport state
 
-**Why:** (TDD) Write failing tests that describe how the canvas SHOULD behave before implementing any canvas code.
+**Why:** (TDD) Write failing tests for core canvas behavior. Focus on happy path, not edge cases.
 
 ---
 
@@ -97,15 +96,12 @@ This document outlines the complete implementation plan for the Figma clone proj
 **TDD Step:** ✍️ WRITE TESTS FIRST
 
 **Tasks:**
-- Write tests for shape creation on canvas click/drag
-- Write tests for selection logic (single click to select)
-- Write tests for visual selection handles rendering
-- Write tests for move functionality (drag selected shapes)
-- Write tests for resize functionality (drag corner handles)
-- Write tests for rotation functionality (drag rotation handle)
-- Write tests for shape property panel updates
+- Write test: Click to create a shape
+- Write test: Click to select a shape
+- Write test: Drag to move selected shape
+- Write test: Drag handle to resize shape
 
-**Why:** (TDD) Write failing tests for shape manipulation features before implementing them.
+**Why:** (TDD) Write failing tests for core shape operations. Keep it simple.
 
 ---
 
@@ -132,14 +128,11 @@ This document outlines the complete implementation plan for the Figma clone proj
 **TDD Step:** ✍️ WRITE TESTS FIRST
 
 **Tasks:**
-- Write tests for multi-selection (shift+click, rectangle selection)
-- Write tests for layer reordering (bring to front, send to back)
-- Write tests for shape locking/unlocking
-- Write tests for alignment tools (all directions)
-- Write tests for distribution tools
-- Write tests for keyboard shortcuts (delete, copy, paste, undo/redo)
+- Write test: Select multiple shapes
+- Write test: Delete key removes selected shape
+- Write test: Bring shape to front/send to back
 
-**Why:** (TDD) Write failing tests for advanced canvas features before implementation.
+**Why:** (TDD) Write failing tests for essential multi-object features only.
 
 ---
 
@@ -148,12 +141,9 @@ This document outlines the complete implementation plan for the Figma clone proj
 **TDD Step:** ✅ MAKE TESTS PASS
 
 **Tasks:**
-- Implement multi-selection (shift+click, drag rectangle to select multiple)
+- Implement multi-selection
 - Add layer reordering (bring to front, send to back)
-- Implement shape locking/unlocking
-- Add alignment tools (align left, center, right, top, middle, bottom)
-- Add distribution tools (distribute horizontally/vertically)
-- Implement keyboard shortcuts (delete, copy, paste, undo/redo basics)
+- Implement delete keyboard shortcut
 - **Run tests from PR #8 - all should pass**
 
 **Why:** (TDD) Implement advanced features to pass all tests from PR #8.
@@ -167,15 +157,12 @@ This document outlines the complete implementation plan for the Figma clone proj
 **TDD Step:** ✍️ WRITE TESTS FIRST
 
 **Tasks:**
-- Write tests for Yjs document creation and structure (Y.Map for shapes)
-- Write tests for bidirectional sync between Zustand store and Yjs document
-- Write tests for WebSocket provider connection/disconnection
-- Write tests for connection status indicator
-- Write tests for reconnection logic and retry attempts
-- Write integration test for shape creation syncing between two mock clients
-- Write tests for sync latency measurement (<100ms target)
+- Write test: Yjs document initializes with Y.Map
+- Write test: Shape added to Zustand syncs to Yjs
+- Write test: WebSocket connects successfully
+- Write test: Two clients sync shape creation
 
-**Why:** (TDD) Write failing tests for Yjs integration before implementing real-time sync features.
+**Why:** (TDD) Write failing tests for core real-time sync functionality.
 
 ---
 
@@ -201,15 +188,11 @@ This document outlines the complete implementation plan for the Figma clone proj
 **TDD Step:** ✍️ WRITE TESTS FIRST
 
 **Tasks:**
-- Write tests for y-websocket server setup
-- Write tests for multiple document room handling
-- Write tests for room join/leave events
-- Write tests for JWT authentication on WebSocket connections
-- Write tests for bidirectional sync between two connected test clients
-- Write tests for sync latency monitoring
-- Write tests for health check endpoint
+- Write test: WebSocket server starts successfully
+- Write test: Client can join a document room
+- Write test: Two clients sync updates
 
-**Why:** (TDD) Write failing tests for backend WebSocket server before implementation.
+**Why:** (TDD) Write failing tests for core WebSocket functionality.
 
 ---
 
@@ -236,15 +219,11 @@ This document outlines the complete implementation plan for the Figma clone proj
 **TDD Step:** ✍️ WRITE TESTS FIRST
 
 **Tasks:**
-- Write tests for Yjs Awareness integration
-- Write tests for CursorOverlay component rendering
-- Write tests for user color assignment (distinct colors)
-- Write tests for cursor position tracking and broadcasting
-- Write tests for presence list UI showing connected users
-- Write tests for user join/leave animations
-- Write tests for cursor rendering performance with multiple users
+- Write test: User cursor displays with name
+- Write test: Multiple users' cursors render
+- Write test: Presence list shows connected users
 
-**Why:** (TDD) Write failing tests for multiplayer presence features before implementation.
+**Why:** (TDD) Write failing tests for core presence features.
 
 ---
 
@@ -274,16 +253,12 @@ This document outlines the complete implementation plan for the Figma clone proj
 **TDD Step:** ✍️ WRITE TESTS FIRST
 
 **Tasks:**
-- Write tests for GET /api/documents (list user documents)
-- Write tests for POST /api/documents (create new)
-- Write tests for GET /api/documents/:id (load document)
-- Write tests for PUT /api/documents/:id (update metadata)
-- Write tests for DELETE /api/documents/:id
-- Write tests for request validation middleware
-- Write tests for CORS configuration
-- Write tests for error handling
+- Write test: GET /api/documents returns list
+- Write test: POST /api/documents creates document
+- Write test: GET /api/documents/:id loads document
+- Write test: DELETE /api/documents/:id deletes document
 
-**Why:** (TDD) Write failing tests for document API endpoints before implementation.
+**Why:** (TDD) Write failing tests for core CRUD operations.
 
 ---
 
@@ -309,15 +284,11 @@ This document outlines the complete implementation plan for the Figma clone proj
 **TDD Step:** ✍️ WRITE TESTS FIRST
 
 **Tasks:**
-- Write tests for periodic snapshot saving
-- Write tests for Yjs document serialization to PostgreSQL
-- Write tests for document loading from database on client connect
-- Write tests for version history (last 50 snapshots)
-- Write tests for restore from version functionality
-- Write tests for persistence with multiple concurrent users
-- Write tests for large document optimization
+- Write test: Save Yjs document to database
+- Write test: Load Yjs document from database
+- Write test: Document persists after disconnect
 
-**Why:** (TDD) Write failing tests for Yjs persistence before implementation.
+**Why:** (TDD) Write failing tests for core persistence functionality.
 
 ---
 
@@ -346,16 +317,12 @@ This document outlines the complete implementation plan for the Figma clone proj
 **TDD Step:** ✍️ WRITE TESTS FIRST
 
 **Tasks:**
-- Write tests for authentication context provider
-- Write tests for signup functionality
-- Write tests for login functionality  
-- Write tests for logout functionality
-- Write tests for protected route middleware
-- Write tests for JWT validation helper functions
-- Write tests for session persistence
-- Write end-to-end tests for complete auth flow
+- Write test: User can signup with email/password
+- Write test: User can login
+- Write test: User can logout
+- Write test: Protected routes require auth
 
-**Why:** (TDD) Write failing tests for authentication before implementation.
+**Why:** (TDD) Write failing tests for core auth flow.
 
 ---
 
@@ -384,16 +351,11 @@ This document outlines the complete implementation plan for the Figma clone proj
 **TDD Step:** ✍️ WRITE TESTS FIRST
 
 **Tasks:**
-- Write tests for JWT authentication on WebSocket connections
-- Write tests for auth middleware on backend API routes
-- Write tests for document ownership linking
-- Write tests for document sharing permissions
-- Write tests for user profile display
-- Write tests for presence awareness with authenticated user identity
-- Write tests for authenticated multi-user collaboration
-- Write tests for auth token refresh
+- Write test: API routes require authentication
+- Write test: Documents are owned by creator
+- Write test: User identity shows in presence
 
-**Why:** (TDD) Write failing tests for auth integration before connecting auth to all app features.
+**Why:** (TDD) Write failing tests for auth integration with app features.
 
 ---
 
@@ -422,15 +384,11 @@ This document outlines the complete implementation plan for the Figma clone proj
 **TDD Step:** ✍️ WRITE TESTS FIRST
 
 **Tasks:**
-- Write tests for /api/ai/interpret endpoint
-- Write tests for OpenAI function schemas (all 7 function types)
-- Write tests for function calling with GPT-4 (mocked responses)
-- Write tests for parsing and validating function call responses
-- Write tests for rate limiting on AI endpoint
-- Write tests for error handling (invalid prompts, API failures)
-- Write tests for AI interaction logging
+- Write test: /api/ai/interpret endpoint accepts prompt
+- Write test: AI returns structured function call
+- Write test: Invalid prompts return error
 
-**Why:** (TDD) Write failing tests for OpenAI integration before implementation.
+**Why:** (TDD) Write failing tests for core AI endpoint functionality.
 
 ---
 
@@ -457,17 +415,12 @@ This document outlines the complete implementation plan for the Figma clone proj
 **TDD Step:** ✍️ WRITE TESTS FIRST
 
 **Tasks:**
-- Write tests for createShape operation (all shape types)
-- Write tests for moveShape operation (relative and absolute)
-- Write tests for resizeShape operation
-- Write tests for rotateShape operation
-- Write tests for createText operation with fontSize
-- Write tests for arrangeShapes operation (horizontal, vertical, grid)
-- Write tests for groupShapes operation
-- Write tests for broadcasting AI operations via Yjs
-- Write tests for complex multi-step AI commands
+- Write test: createShape adds shape to canvas
+- Write test: moveShape updates shape position
+- Write test: arrangeShapes creates grid layout
+- Write test: AI changes sync to other clients
 
-**Why:** (TDD) Write failing tests for AI canvas operations before implementation.
+**Why:** (TDD) Write failing tests for core AI operations.
 
 ---
 
@@ -495,15 +448,11 @@ This document outlines the complete implementation plan for the Figma clone proj
 **TDD Step:** ✍️ WRITE TESTS FIRST
 
 **Tasks:**
-- Write tests for AI chat panel/modal component
-- Write tests for text input and command submission
-- Write tests for AI loading state display
-- Write tests for visual feedback on canvas
-- Write tests for example prompts functionality
-- Write tests for command history
-- Write tests for error handling UI
+- Write test: AI panel opens and closes
+- Write test: User can submit prompt
+- Write test: Loading state displays during AI request
 
-**Why:** (TDD) Write failing tests for AI UI before implementation.
+**Why:** (TDD) Write failing tests for core AI UI interactions.
 
 ---
 

@@ -220,7 +220,7 @@ For each feature:
 ✅ **Reality**: Tests written after are harder to write and often miss edge cases. Tests written first guide better design.
 
 ### ❌ Myth: "TDD means 100% test coverage"
-✅ **Reality**: TDD focuses on behavior, not coverage. Aim for 80%+ coverage of important functionality.
+✅ **Reality**: TDD focuses on behavior, not coverage. Test core features and happy paths - comprehensive edge case testing comes later if needed.
 
 ### ❌ Myth: "I need to test everything perfectly on first try"
 ✅ **Reality**: Write basic tests first, then add more as you discover edge cases. It's iterative!

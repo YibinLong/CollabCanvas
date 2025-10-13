@@ -73,8 +73,19 @@ This pattern repeats for:
 1. **Never modify tests to make them pass** (unless the test was incorrect)
 2. **Tests must fail first** before writing implementation
 3. **Each test PR is paired with an implementation PR**
-4. **Keep test coverage above 80%**
+4. **Focus on core functionality** - test the happy path, not every edge case
 5. **Run all tests before merging each PR**
+
+## Test Philosophy: Simplified & Practical
+
+We're following **pragmatic TDD**, not dogmatic TDD:
+- ✅ Test core features and main user flows
+- ✅ Test that the happy path works
+- ❌ Don't test every edge case upfront
+- ❌ Don't aim for 100% coverage
+- ❌ Don't write tests for trivial getters/setters
+
+**Goal**: Confidence that core functionality works, not exhaustive test suites.
 
 ## Example: How to Work Through Canvas Features
 

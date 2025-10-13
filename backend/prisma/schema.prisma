@@ -1,0 +1,74 @@
+// This is your Prisma schema file
+// It defines the database structure (models/tables)
+
+// Generator: Creates the TypeScript Prisma Client for querying the database
+generator client {
+  provider = "prisma-client-js"
+}
+
+// Datasource: Connects to PostgreSQL database (URL from .env file)
+// Note: directUrl is used for Supabase connection pooling
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// User model: Stores user information
+// This is linked to Supabase Auth but we store additional metadata here
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  name      String?
+  avatarUrl String?  @map("avatar_url")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relations: One user can own many documents
+  documents Document[]
+
+  @@map("users") // Table name in database
+}
+
+// Document model: Stores canvas documents
+// Each document contains a Yjs state (the canvas data)
+model Document {
+  id        String   @id @default(uuid())
+  title     String   @default("Untitled")
+  ownerId   String   @map("owner_id")
+  
+  // The Yjs state stored as binary data (this is the entire canvas state)
+  yjsState  Bytes?   @map("yjs_state")
+  
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  owner    User               @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  versions DocumentVersion[]
+
+  @@index([ownerId]) // Index for faster queries by owner
+  @@map("documents")
+}
+
+// DocumentVersion model: Stores historical snapshots of documents
+// This allows users to restore previous versions
+model DocumentVersion {
+  id         String   @id @default(uuid())
+  documentId String   @map("document_id")
+  
+  // Snapshot of the Yjs state at this point in time
+  yjsState   Bytes    @map("yjs_state")
+  
+  // Optional description (e.g., "Before AI changes", "Manual save")
+  label      String?
+  
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  // Relations
+  document Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  @@index([documentId, createdAt]) // Index for faster version history queries
+  @@map("document_versions")
+}
+

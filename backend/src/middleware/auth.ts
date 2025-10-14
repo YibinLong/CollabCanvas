@@ -1,5 +1,5 @@
 /**
- * Authentication Middleware (PR #17)
+ * Authentication Middleware (PR #17, Updated in PR #21)
  * 
  * WHY: We need to identify which user is making each request so we can
  * return only their documents and enforce ownership rules.
@@ -7,16 +7,17 @@
  * WHAT: This middleware extracts the user ID from the request and attaches
  * it to the request object for use in controllers.
  * 
- * CURRENT (Phase 4): Uses x-user-id header (simple mock auth for testing)
- * FUTURE (Phase 5): Will validate JWT tokens from Supabase Auth
+ * PHASE 4: mockAuth - Uses x-user-id header (simple mock auth for testing)
+ * PHASE 5: authenticateJWT - Validates JWT tokens from Supabase Auth ✅
  * 
  * HOW IT WORKS:
- * 1. Extract user ID from request header
+ * 1. Extract user ID from request header (mockAuth) or JWT token (authenticateJWT)
  * 2. Attach it to req.userId
  * 3. Call next() to pass control to the route handler
  */
 
 import { Request, Response, NextFunction } from 'express';
+import { verifyToken } from '../utils/supabase';
 
 /**
  * Mock Authentication Middleware
@@ -41,19 +42,19 @@ export function mockAuth(req: Request, res: Response, next: NextFunction) {
 }
 
 /**
- * Real Authentication Middleware (will be implemented in Phase 5)
+ * Real Authentication Middleware (PR #21 - IMPLEMENTED!)
  * 
  * WHY: In production, we need to validate JWT tokens from Supabase Auth
  * to ensure users are who they claim to be.
  * 
- * HOW IT WILL WORK:
+ * HOW IT WORKS:
  * 1. Extract JWT from Authorization header
- * 2. Verify JWT with Supabase
+ * 2. Verify JWT with Supabase using verifyToken helper
  * 3. Extract user ID from verified token
  * 4. Attach to req.userId
- * 5. Call next()
+ * 5. Call next() to continue to route handler
  * 
- * For now, this is a placeholder. We'll implement it in Phase 5.
+ * SECURITY: If token is missing, invalid, or expired, request is rejected with 401.
  */
 export async function authenticateJWT(
   req: Request,
@@ -71,20 +72,18 @@ export async function authenticateJWT(
 
     const token = authHeader.substring(7); // Remove "Bearer " prefix
 
-    // TODO (Phase 5): Verify token with Supabase
-    // const { data, error } = await supabase.auth.getUser(token);
-    // if (error) throw error;
-    // (req as any).userId = data.user.id;
+    // Verify token with Supabase using verifyToken helper
+    const user = await verifyToken(token);
+    
+    // Attach user ID to request for use in controllers
+    (req as any).userId = user.id;
+    (req as any).user = user; // Also attach full user object for convenience
 
-    // For now, just fail - this will be implemented in Phase 5
-    return res.status(501).json({ 
-      error: 'JWT authentication not implemented yet (Phase 5)' 
-    });
-
-    // next(); // Will be uncommented in Phase 5
+    // Continue to route handler
+    next();
   } catch (error) {
     console.error('Auth error:', error);
-    res.status(401).json({ error: 'Invalid token' });
+    res.status(401).json({ error: 'Invalid or expired token' });
   }
 }
 

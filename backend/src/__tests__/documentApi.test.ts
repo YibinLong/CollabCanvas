@@ -1,5 +1,5 @@
 /**
- * Document API Tests (PR #16)
+ * Document API Tests (PR #16, Updated in PR #23)
  * 
  * WHY: These tests define the expected behavior of our document management API
  * before we write any implementation code. This is Test-Driven Development (TDD).
@@ -10,8 +10,7 @@
  * - GET /api/documents/:id - Load a specific document
  * - DELETE /api/documents/:id - Delete a document
  * 
- * NOTE: These tests will FAIL initially. That's expected! We'll implement the
- * API in PR #17 to make them pass.
+ * PHASE 5: Updated to use JWT authentication instead of mockAuth
  */
 
 import request from 'supertest';
@@ -21,13 +20,20 @@ import express from 'express';
  * Test Setup
  * 
  * WHY: We'll set up an Express app before tests run.
- * We mock Prisma for now since we don't have a test database configured.
- * 
- * NOTE: These tests use mocked Prisma. Real integration tests with a
- * PostgreSQL database should be added when setting up Supabase.
+ * We mock Prisma and Supabase for testing without real services.
  */
 let app: express.Application;
 let testUserId: string;
+
+// Mock Supabase
+jest.mock('../utils/supabase', () => ({
+  verifyToken: jest.fn(),
+  supabase: {
+    auth: {
+      getUser: jest.fn(),
+    },
+  },
+}));
 
 // Mock Prisma client
 jest.mock('../utils/prisma', () => {
@@ -63,6 +69,13 @@ beforeEach(() => {
   jest.clearAllMocks();
   
   testUserId = 'test-user-1';
+  
+  // Mock JWT verification to return test user
+  const { verifyToken } = require('../utils/supabase');
+  verifyToken.mockResolvedValue({
+    id: testUserId,
+    email: 'test@example.com',
+  });
 });
 
 // Helper to get mocked prisma
@@ -86,7 +99,7 @@ describe('GET /api/documents', () => {
     // Make request to the API
     const response = await request(app)
       .get('/api/documents')
-      .set('x-user-id', testUserId); // Mock auth - real auth will be added in Phase 5
+      .set('Authorization', 'Bearer fake-jwt-token'); // Mock auth - real auth will be added in Phase 5
     
     // Verify response
     expect(response.status).toBe(200);
@@ -127,7 +140,7 @@ describe('GET /api/documents', () => {
     // Make request
     const response = await request(app)
       .get('/api/documents')
-      .set('x-user-id', testUserId);
+      .set('Authorization', 'Bearer fake-jwt-token');
     
     // Verify response
     expect(response.status).toBe(200);
@@ -159,7 +172,7 @@ describe('GET /api/documents', () => {
     // Request as test user
     const response = await request(app)
       .get('/api/documents')
-      .set('x-user-id', testUserId);
+      .set('Authorization', 'Bearer fake-jwt-token');
     
     // Should only see own documents
     expect(response.status).toBe(200);
@@ -199,7 +212,7 @@ describe('POST /api/documents', () => {
     // Make request without title
     const response = await request(app)
       .post('/api/documents')
-      .set('x-user-id', testUserId)
+      .set('Authorization', 'Bearer fake-jwt-token')
       .send({});
     
     // Verify response
@@ -240,7 +253,7 @@ describe('POST /api/documents', () => {
     // Make request with custom title
     const response = await request(app)
       .post('/api/documents')
-      .set('x-user-id', testUserId)
+      .set('Authorization', 'Bearer fake-jwt-token')
       .send({ title: 'My Design Project' });
     
     // Verify response
@@ -273,7 +286,7 @@ describe('POST /api/documents', () => {
 
     const response = await request(app)
       .post('/api/documents')
-      .set('x-user-id', testUserId)
+      .set('Authorization', 'Bearer fake-jwt-token')
       .send({ title: 'Test Doc' });
     
     // Verify yjsState is null
@@ -314,7 +327,7 @@ describe('GET /api/documents/:id', () => {
     // Make request
     const response = await request(app)
       .get(`/api/documents/${mockDoc.id}`)
-      .set('x-user-id', testUserId);
+      .set('Authorization', 'Bearer fake-jwt-token');
     
     // Verify response
     expect(response.status).toBe(200);
@@ -337,7 +350,7 @@ describe('GET /api/documents/:id', () => {
 
     const response = await request(app)
       .get('/api/documents/non-existent-id')
-      .set('x-user-id', testUserId);
+      .set('Authorization', 'Bearer fake-jwt-token');
     
     expect(response.status).toBe(404);
     expect(response.body).toMatchObject({
@@ -362,7 +375,7 @@ describe('GET /api/documents/:id', () => {
     // Try to access as test user
     const response = await request(app)
       .get(`/api/documents/${mockDoc.id}`)
-      .set('x-user-id', testUserId);
+      .set('Authorization', 'Bearer fake-jwt-token');
     
     // Should be forbidden
     expect(response.status).toBe(403);
@@ -397,7 +410,7 @@ describe('DELETE /api/documents/:id', () => {
     // Make request
     const response = await request(app)
       .delete(`/api/documents/${mockDoc.id}`)
-      .set('x-user-id', testUserId);
+      .set('Authorization', 'Bearer fake-jwt-token');
     
     // Verify response
     expect(response.status).toBe(200);
@@ -418,7 +431,7 @@ describe('DELETE /api/documents/:id', () => {
 
     const response = await request(app)
       .delete('/api/documents/non-existent-id')
-      .set('x-user-id', testUserId);
+      .set('Authorization', 'Bearer fake-jwt-token');
     
     expect(response.status).toBe(404);
     
@@ -443,7 +456,7 @@ describe('DELETE /api/documents/:id', () => {
     // Try to delete as test user
     const response = await request(app)
       .delete(`/api/documents/${mockDoc.id}`)
-      .set('x-user-id', testUserId);
+      .set('Authorization', 'Bearer fake-jwt-token');
     
     // Should be forbidden
     expect(response.status).toBe(403);
@@ -470,7 +483,7 @@ describe('DELETE /api/documents/:id', () => {
     // Delete document
     const response = await request(app)
       .delete(`/api/documents/${mockDoc.id}`)
-      .set('x-user-id', testUserId);
+      .set('Authorization', 'Bearer fake-jwt-token');
     
     expect(response.status).toBe(200);
     

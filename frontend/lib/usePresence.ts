@@ -1,5 +1,5 @@
 /**
- * Presence Hook - Manage User Awareness
+ * Presence Hook - Manage User Awareness (PR #23 - UPDATED!)
  * 
  * WHY: Yjs Awareness is a separate channel from document sync that handles
  * ephemeral data like cursor positions and online status. This hook manages
@@ -12,6 +12,8 @@
  * 4. Manages user colors and names
  * 5. Handles join/leave events
  * 
+ * PHASE 5: Now uses authenticated user identity (name/email) ✅
+ * 
  * HOW TO USE:
  * const { users, updateCursor } = usePresence(provider, currentUser)
  */
@@ -20,6 +22,7 @@ import { useEffect, useState, useCallback, useRef } from 'react'
 import { WebsocketProvider } from 'y-websocket'
 import { Awareness } from 'y-protocols/awareness'
 import type { PresenceUser } from '@/components/CursorOverlay'
+import { useAuth } from './AuthContext'
 
 /**
  * Current user data

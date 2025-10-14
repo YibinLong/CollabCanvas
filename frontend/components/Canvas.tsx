@@ -20,10 +20,11 @@
 
 'use client'
 
-import { useEffect, useRef, useState, useCallback } from 'react'
+import { useEffect, useRef, useState, useCallback, useMemo } from 'react'
 import { useCanvasStore } from '@/lib/canvasStore'
 import { useYjsSync } from '@/lib/useYjsSync'
 import { usePresence, throttle } from '@/lib/usePresence'
+import { useAuth } from '@/lib/AuthContext'
 import Rectangle from './shapes/Rectangle'
 import Circle from './shapes/Circle'
 import Line from './shapes/Line'
@@ -62,47 +63,40 @@ export default function Canvas() {
   } = useCanvasStore()
   
   /**
-   * Real-time collaboration hooks
+   * Real-time collaboration hooks (PR #23 - UPDATED!)
    * 
    * WHY: These hooks enable multiple users to work together in real-time.
    * - useYjsSync: Syncs shapes between all connected users
    * - usePresence: Tracks cursor positions and user presence
+   * 
+   * PHASE 5: Now uses authenticated user identity ✅
    */
   const documentId = 'test-document-123' // TODO: Phase 4 will make this dynamic
   const { connected, status, provider } = useYjsSync(documentId)
   
-  // Mock current user (Phase 5 will get this from auth)
-  // Generate a stable user ID that persists across renders
-  const [currentUser] = useState(() => {
-    // Check localStorage for existing user ID
-    if (typeof window !== 'undefined') {
-      let userId = localStorage.getItem('collabcanvas-user-id')
-      let userName = localStorage.getItem('collabcanvas-user-name')
-      
-      if (!userId) {
-        userId = `user-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
-        localStorage.setItem('collabcanvas-user-id', userId)
-      }
-      
-      if (!userName) {
-        userName = `User ${Math.floor(Math.random() * 100)}`
-        localStorage.setItem('collabcanvas-user-name', userName)
-      }
-      
+  /**
+   * Get authenticated user info (PR #23 - NEW!)
+   * 
+   * WHY: Use real user identity from authentication instead of mock data
+   */
+  const { user } = useAuth()
+  
+  // Create currentUser object from authenticated user
+  const currentUser = useMemo(() => {
+    if (!user) {
       return {
-        id: userId,
-        name: userName,
-        color: '#3b82f6',
+        id: 'anonymous',
+        name: 'Anonymous',
+        color: '#9ca3af',
       }
     }
     
-    // Fallback for SSR
     return {
-      id: `user-${Date.now()}`,
-      name: `User ${Math.floor(Math.random() * 100)}`,
-      color: '#3b82f6',
+      id: user.id,
+      name: user.email || 'User',
+      color: '#3b82f6', // Color will be assigned by usePresence based on user ID
     }
-  })
+  }, [user])
   
   const { users, updateCursor } = usePresence(provider, currentUser)
   

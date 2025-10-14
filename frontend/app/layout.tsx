@@ -1,6 +1,7 @@
 import './globals.css';
 import type { Metadata } from 'next';
 import { Inter } from 'next/font/google';
+import { AuthProvider } from '@/lib/AuthContext';
 
 // Load Inter font from Google Fonts for modern, clean typography
 const inter = Inter({ subsets: ['latin'] });
@@ -12,14 +13,16 @@ export const metadata: Metadata = {
 };
 
 /**
- * Root Layout Component
+ * Root Layout Component (Updated in PR #21)
  * 
  * WHY: This wraps every page in the app. It's where we set up:
  * - Global styles (Tailwind CSS)
  * - Fonts
- * - Any providers that need to wrap the entire app (auth, state management)
+ * - AuthProvider: Makes authentication available to all pages/components
  * 
  * WHAT: The {children} prop will be replaced with each page's content
+ * 
+ * PHASE 5: Now includes AuthProvider so any component can use useAuth()
  */
 export default function RootLayout({
   children,
@@ -28,7 +31,9 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body className={inter.className}>{children}</body>
+      <body className={inter.className}>
+        <AuthProvider>{children}</AuthProvider>
+      </body>
     </html>
   );
 }

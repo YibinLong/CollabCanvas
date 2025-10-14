@@ -7,18 +7,64 @@
  * WHAT: Shows the Canvas component with a Toolbar, ConnectionStatus, and PresenceList.
  * 
  * PHASE 3: Now includes real-time collaboration features!
+ * PHASE 5: Now includes authentication protection!
  */
 
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import Canvas from '@/components/Canvas'
 import Toolbar from '@/components/Toolbar'
 import ConnectionStatus from '@/components/ConnectionStatus'
 import PresenceList from '@/components/PresenceList'
+import { useAuth } from '@/lib/AuthContext'
 
 export default function Home() {
+  const router = useRouter()
+  const { user, loading, logout } = useAuth()
   const [showPresence, setShowPresence] = useState(false)
+
+  /**
+   * Protected Route Logic
+   * 
+   * WHY: Only logged-in users should access the canvas
+   * 
+   * WHAT: If user is not logged in, redirect to login page
+   */
+  useEffect(() => {
+    if (!loading && !user) {
+      router.push('/login')
+    }
+  }, [user, loading, router])
+
+  /**
+   * Handle Logout
+   * 
+   * WHY: User needs a way to sign out
+   */
+  const handleLogout = async () => {
+    try {
+      await logout()
+      router.push('/login')
+    } catch (error) {
+      console.error('Logout error:', error)
+    }
+  }
+
+  // Show loading state while checking authentication
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-900 flex items-center justify-center">
+        <div className="text-white text-xl">Loading...</div>
+      </div>
+    )
+  }
+
+  // Don't render canvas if not authenticated
+  if (!user) {
+    return null
+  }
   
   return (
     <main className="relative w-screen h-screen overflow-hidden bg-gray-900">
@@ -26,10 +72,10 @@ export default function Home() {
       <div className="absolute top-0 left-0 right-0 bg-gray-800 border-b border-gray-700 px-4 py-2 z-10 flex items-center justify-between">
         <div>
           <h1 className="text-white font-semibold">
-            CollabCanvas - Phase 3: Real-Time Collaboration! 🎉
+            CollabCanvas - Phase 5: Authentication! 🔐
           </h1>
           <p className="text-gray-400 text-sm">
-            Open multiple browser windows to test collaboration! See instructions below.
+            Logged in as: <span className="text-blue-400">{user.email}</span>
           </p>
         </div>
         
@@ -39,6 +85,13 @@ export default function Home() {
             className="text-white text-sm px-3 py-1 bg-gray-700 hover:bg-gray-600 rounded"
           >
             {showPresence ? 'Hide' : 'Show'} Users
+          </button>
+          <button
+            onClick={handleLogout}
+            className="text-white text-sm px-3 py-1 bg-red-600 hover:bg-red-700 rounded"
+            data-testid="logout-button"
+          >
+            Logout
           </button>
           {/* Connection status will be wired up when Canvas exports it */}
           <div className="text-white text-xs">

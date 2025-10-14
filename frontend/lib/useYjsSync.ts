@@ -21,6 +21,7 @@ import * as Y from 'yjs'
 import { WebsocketProvider } from 'y-websocket'
 import { useCanvasStore } from './canvasStore'
 import type { Shape } from '@/types/canvas'
+import { getAuthToken } from './supabase'
 
 /**
  * Connection status type
@@ -74,45 +75,85 @@ export function useYjsSync(
     if (!enabled) return
 
     /**
-     * STEP 1: Create Yjs document
+     * STEP 0: Initialize with authentication (PR #23 - NEW!)
      * 
-     * WHY: Y.Doc is the container for all collaborative data.
-     * We use Y.Map to store shapes because it syncs well across clients.
+     * WHY: We need to pass the JWT token to authenticate the WebSocket connection
      */
-    const doc = new Y.Doc()
-    docRef.current = doc
-    
-    // Get the shapes map (creates it if it doesn't exist)
-    const shapesMap = doc.getMap('shapes')
+    const initializeConnection = async () => {
+      /**
+       * STEP 1: Create Yjs document
+       * 
+       * WHY: Y.Doc is the container for all collaborative data.
+       * We use Y.Map to store shapes because it syncs well across clients.
+       */
+      const doc = new Y.Doc()
+      docRef.current = doc
+      
+      // Get the shapes map (creates it if it doesn't exist)
+      const shapesMap = doc.getMap('shapes')
 
-    const addOrUpdateShapeFromRemote = (id: string, shapeData: Shape) => {
-      const currentShapes = useCanvasStore.getState().shapes
-      if (currentShapes.has(id)) {
-        updateShape(id, shapeData)
-      } else {
-        addShape(shapeData)
+      const addOrUpdateShapeFromRemote = (id: string, shapeData: Shape) => {
+        const currentShapes = useCanvasStore.getState().shapes
+        if (currentShapes.has(id)) {
+          updateShape(id, shapeData)
+        } else {
+          addShape(shapeData)
+        }
       }
+
+      /**
+       * STEP 2: Set up WebSocket provider with authentication (PR #23 - UPDATED!)
+       * 
+       * WHY: The provider connects our Yjs document to the server.
+       * It automatically sends updates when we change the document,
+       * and receives updates from other users.
+       * 
+       * PHASE 5: Now includes JWT token for authentication ✅
+       * 
+       * HOW IT WORKS:
+       * - wsUrl: Server address (e.g., 'ws://localhost:4000')
+       * - documentId: Room name (all users in the same room share the same document)
+       * - doc: The Yjs document to sync
+       * - params: Query parameters including auth token
+       */
+      const serverUrl = wsUrl || process.env.NEXT_PUBLIC_WS_URL || 'ws://localhost:4000'
+      
+      // Get JWT token for authentication
+      const token = await getAuthToken()
+      
+      if (!token) {
+        console.error('[Yjs] No auth token available')
+        setStatus('error')
+        setError('Authentication required')
+        return null
+      }
+
+      // Create WebSocket URL with token parameter
+      const urlWithAuth = `${serverUrl}/${documentId}?token=${token}`
+      
+      // Create provider with authenticated URL
+      // Note: We pass the base URL to WebsocketProvider, but it constructs the full URL internally
+      const provider = new WebsocketProvider(
+        serverUrl, 
+        documentId, 
+        doc, 
+        {
+          // Options for the WebSocket connection
+          connect: true, // Connect immediately
+          // Pass token as query parameter
+          params: { token }
+        }
+      )
+      providerRef.current = provider
+      
+      return { doc, shapesMap, provider, addOrUpdateShapeFromRemote }
     }
 
-    /**
-     * STEP 2: Set up WebSocket provider
-     * 
-     * WHY: The provider connects our Yjs document to the server.
-     * It automatically sends updates when we change the document,
-     * and receives updates from other users.
-     * 
-     * HOW IT WORKS:
-     * - wsUrl: Server address (e.g., 'ws://localhost:4000')
-     * - documentId: Room name (all users in the same room share the same document)
-     * - doc: The Yjs document to sync
-     */
-    const serverUrl = wsUrl || process.env.NEXT_PUBLIC_WS_URL || 'ws://localhost:4000'
-    const provider = new WebsocketProvider(serverUrl, documentId, doc, {
-      // Options for the WebSocket connection
-      connect: true, // Connect immediately
-      // You can add authentication here later
-    })
-    providerRef.current = provider
+    // Start async initialization
+    initializeConnection().then((result) => {
+      if (!result) return // Failed to initialize
+      
+      const { doc, shapesMap, provider, addOrUpdateShapeFromRemote } = result
 
     /**
      * STEP 3: Listen to connection status events
@@ -282,21 +323,38 @@ export function useYjsSync(
      * WHY: When the component unmounts, we need to disconnect from the
      * server and clean up event listeners to prevent memory leaks.
      */
-    return () => {
-      console.log('[Yjs] Cleaning up...')
-      
-      // Clear any pending sync
-      if (syncTimeout) {
-        clearTimeout(syncTimeout)
-        // Sync one final time before disconnecting
-        syncToYjs()
+      return () => {
+        console.log('[Yjs] Cleaning up...')
+        
+        // Clear any pending sync
+        if (syncTimeout) {
+          clearTimeout(syncTimeout)
+          // Sync one final time before disconnecting
+          syncToYjs()
+        }
+        
+        shapesMap.unobserveDeep(handleYjsUpdate)
+        unsubscribe()
+        provider.disconnect()
+        provider.destroy()
+        doc.destroy()
       }
-      
-      shapesMap.unobserveDeep(handleYjsUpdate)
-      unsubscribe()
-      provider.disconnect()
-      provider.destroy()
-      doc.destroy()
+    }).catch((error) => {
+      console.error('[Yjs] Initialization error:', error)
+      setStatus('error')
+      setError(error.message || 'Failed to initialize collaboration')
+    })
+
+    // Cleanup function for the effect itself
+    return () => {
+      // Cleanup will be handled by the inner return function
+      if (providerRef.current) {
+        providerRef.current.disconnect()
+        providerRef.current.destroy()
+      }
+      if (docRef.current) {
+        docRef.current.destroy()
+      }
     }
   }, [documentId, wsUrl, enabled, addShape, updateShape, removeShape])
 

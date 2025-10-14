@@ -74,6 +74,9 @@ export default function Canvas({ provider, users, updateCursor, currentUser }: C
     updateShape,
     toggleSelection,
     deleteSelected,
+    lockShape,
+    unlockShape,
+    isShapeLocked,
   } = useCanvasStore()
   
   /**
@@ -348,6 +351,7 @@ export default function Canvas({ provider, users, updateCursor, currentUser }: C
    * 
    * WHY: When user releases mouse, we need to finish the current operation.
    * We also need to prevent onClick from firing immediately after a drag.
+   * ALSO: Release any locks held on shapes.
    */
   const handleMouseUp = () => {
     // Track if we just finished any drag operation (creating, moving, or resizing)
@@ -360,6 +364,12 @@ export default function Canvas({ provider, users, updateCursor, currentUser }: C
       if (interactionStateRef.current.creatingShapeId) {
         selectShape(interactionStateRef.current.creatingShapeId)
       }
+    }
+    
+    // Release lock if we were moving or resizing
+    if ((interactionMode === 'moving' || interactionMode === 'resizing') && 
+        interactionStateRef.current.shapeId) {
+      unlockShape(interactionStateRef.current.shapeId)
     }
     
     setInteractionMode('none')
@@ -428,6 +438,15 @@ export default function Canvas({ provider, users, updateCursor, currentUser }: C
     
     const shape = shapes.get(shapeId)
     if (!shape) return
+    
+    // Check if shape is locked by another user
+    if (isShapeLocked(shapeId, currentUser.id)) {
+      console.log(`Shape is currently being edited by another user`)
+      return
+    }
+    
+    // Acquire lock before resizing
+    lockShape(shapeId, currentUser.id)
     
     const svgCoords = screenToSVG(e.clientX, e.clientY)
     setInteractionMode('resizing')
@@ -511,10 +530,43 @@ export default function Canvas({ provider, users, updateCursor, currentUser }: C
   }, [isSpacePressed, deleteSelected])
   
   /**
+   * Automatic lock timeout mechanism
+   * 
+   * WHY: If a user's browser crashes or they disconnect while editing a shape,
+   * that shape would remain locked forever. We need to automatically release
+   * stale locks after a timeout period.
+   * 
+   * HOW: Every 5 seconds, check all shapes for locks older than 30 seconds.
+   * If found, release them automatically.
+   */
+  useEffect(() => {
+    const LOCK_TIMEOUT = 30000 // 30 seconds
+    const CHECK_INTERVAL = 5000 // Check every 5 seconds
+    
+    const interval = setInterval(() => {
+      const now = Date.now()
+      
+      shapes.forEach((shape) => {
+        // Only release locks from OTHER users (not our own)
+        if (shape.lockedBy && 
+            shape.lockedBy !== currentUser.id && 
+            shape.lockedAt && 
+            (now - shape.lockedAt) > LOCK_TIMEOUT) {
+          console.log(`Auto-releasing stale lock on shape ${shape.id}`)
+          unlockShape(shape.id)
+        }
+      })
+    }, CHECK_INTERVAL)
+    
+    return () => clearInterval(interval)
+  }, [shapes, currentUser.id, unlockShape])
+  
+  /**
    * Render a single shape
    */
   const renderShape = (shape: Shape) => {
     const isSelected = selectedIds.includes(shape.id)
+    const isLockedByOther = isShapeLocked(shape.id, currentUser.id)
     
     const handleClick = (e: React.MouseEvent) => {
       handleShapeClick(shape, e)
@@ -522,6 +574,13 @@ export default function Canvas({ provider, users, updateCursor, currentUser }: C
     
     const handleShapeMouseDown = (e: React.MouseEvent) => {
       e.stopPropagation()
+      
+      // Check if shape is locked by another user
+      if (isShapeLocked(shape.id, currentUser.id)) {
+        // Show a visual indication (could be improved with a toast notification)
+        console.log(`Shape is currently being edited by another user`)
+        return
+      }
       
       // If not selected, just select it
       if (!isSelected) {
@@ -531,6 +590,9 @@ export default function Canvas({ provider, users, updateCursor, currentUser }: C
       
       // If selected and using select tool, start moving
       if (currentTool === 'select') {
+        // Acquire lock before moving
+        lockShape(shape.id, currentUser.id)
+        
         const svgCoords = screenToSVG(e.clientX, e.clientY)
         setInteractionMode('moving')
         interactionStateRef.current = {
@@ -545,6 +607,9 @@ export default function Canvas({ provider, users, updateCursor, currentUser }: C
     }
     
     let shapeElement: React.ReactNode
+    // Add a wrapper with cursor styling for locked shapes
+    const wrapperStyle = isLockedByOther ? { cursor: 'not-allowed' } : {}
+    
     switch (shape.type) {
       case 'rect':
         shapeElement = <Rectangle key={shape.id} shape={shape} isSelected={isSelected} onClick={handleClick} onMouseDown={handleShapeMouseDown} />
@@ -565,11 +630,49 @@ export default function Canvas({ provider, users, updateCursor, currentUser }: C
     return (
       <g key={shape.id}>
         {shapeElement}
-        {isSelected && (
+        {isSelected && !isLockedByOther && (
           <ResizeHandles
             shape={shape}
             onResizeStart={(position, e) => handleResizeStart(shape.id, position, e)}
           />
+        )}
+        {/* Visual indicator for locked shapes */}
+        {isLockedByOther && (
+          <g>
+            {/* Red dashed border around locked shape */}
+            {shape.type === 'rect' && (
+              <rect
+                x={shape.x - 3}
+                y={shape.y - 3}
+                width={shape.width + 6}
+                height={shape.height + 6}
+                fill="none"
+                stroke="#ef4444"
+                strokeWidth="2"
+                strokeDasharray="5,5"
+                pointerEvents="none"
+              />
+            )}
+            {shape.type === 'circle' && (
+              <circle
+                cx={shape.x}
+                cy={shape.y}
+                r={shape.radius + 3}
+                fill="none"
+                stroke="#ef4444"
+                strokeWidth="2"
+                strokeDasharray="5,5"
+                pointerEvents="none"
+              />
+            )}
+            {/* Lock icon indicator */}
+            <g transform={`translate(${shape.type === 'circle' ? shape.x - shape.radius : shape.x}, ${shape.type === 'circle' ? shape.y - shape.radius - 25 : shape.y - 25})`}>
+              <rect x="0" y="0" width="60" height="20" fill="rgba(239, 68, 68, 0.9)" rx="3" />
+              <text x="30" y="14" fill="white" fontSize="12" textAnchor="middle" pointerEvents="none">
+                🔒 Locked
+              </text>
+            </g>
+          </g>
         )}
       </g>
     )

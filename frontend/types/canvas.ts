@@ -19,6 +19,9 @@ export interface BaseShape {
   rotation?: number;
   locked?: boolean;
   zIndex?: number;
+  // Conflict resolution fields - tracks which user is currently editing this shape
+  lockedBy?: string | null;  // User ID of who's editing it
+  lockedAt?: number | null;   // Timestamp when locked (for timeout detection)
 }
 
 // Rectangle shape

@@ -54,6 +54,12 @@ interface CanvasStore {
   bringToFront: (id: string) => void
   sendToBack: (id: string) => void
   deleteSelected: () => void
+  
+  // Conflict resolution actions
+  lockShape: (id: string, userId: string) => void
+  unlockShape: (id: string) => void
+  isShapeLocked: (id: string, currentUserId: string) => boolean
+  releaseAllLocks: (userId: string) => void
 }
 
 /**
@@ -328,20 +334,135 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
    * triggered by Delete or Backspace key.
    * 
    * HOW: Remove all shapes whose IDs are in selectedIds.
+   * NOTE: Won't delete shapes that are locked by other users.
    */
   deleteSelected: () => {
     set((state) => {
       if (state.selectedIds.length === 0) return state
       
       const newShapes = new Map(state.shapes)
+      const remainingSelectedIds: string[] = []
+      
       state.selectedIds.forEach(id => {
-        newShapes.delete(id)
+        const shape = state.shapes.get(id)
+        // Don't delete if shape is locked (lockedBy exists and is not null)
+        if (shape && shape.lockedBy) {
+          console.log(`Cannot delete shape ${id} - locked by another user`)
+          remainingSelectedIds.push(id)
+        } else {
+          newShapes.delete(id)
+        }
       })
       
       return {
         shapes: newShapes,
-        selectedIds: [], // Clear selection after deleting
+        selectedIds: remainingSelectedIds, // Keep locked shapes selected
       }
+    })
+  },
+  
+  /**
+   * Lock a shape for editing by a specific user
+   * 
+   * WHY: When a user starts moving or resizing a shape, we "lock" it
+   * so other users can't edit it simultaneously. This prevents conflicts
+   * where two users try to modify the same shape at the same time.
+   * 
+   * HOW: Set lockedBy to the user's ID and lockedAt to current timestamp.
+   * 
+   * @param id - Shape ID to lock
+   * @param userId - ID of the user locking the shape
+   */
+  lockShape: (id: string, userId: string) => {
+    set((state) => {
+      const shape = state.shapes.get(id)
+      if (!shape) return state
+      
+      const newShapes = new Map(state.shapes)
+      newShapes.set(id, { 
+        ...shape, 
+        lockedBy: userId, 
+        lockedAt: Date.now() 
+      })
+      
+      return { shapes: newShapes }
+    })
+  },
+  
+  /**
+   * Unlock a shape
+   * 
+   * WHY: When a user finishes moving/resizing, release the lock
+   * so other users can now edit it.
+   * 
+   * HOW: Set lockedBy and lockedAt to null.
+   * 
+   * @param id - Shape ID to unlock
+   */
+  unlockShape: (id: string) => {
+    set((state) => {
+      const shape = state.shapes.get(id)
+      if (!shape) return state
+      
+      const newShapes = new Map(state.shapes)
+      newShapes.set(id, { 
+        ...shape, 
+        lockedBy: null, 
+        lockedAt: null 
+      })
+      
+      return { shapes: newShapes }
+    })
+  },
+  
+  /**
+   * Check if a shape is locked by another user
+   * 
+   * WHY: Before allowing a user to interact with a shape, check if
+   * someone else is currently editing it.
+   * 
+   * HOW: Return true if lockedBy exists and is NOT the current user.
+   * 
+   * @param id - Shape ID to check
+   * @param currentUserId - ID of the current user
+   * @returns true if locked by someone else, false otherwise
+   */
+  isShapeLocked: (id: string, currentUserId: string) => {
+    const shape = get().shapes.get(id)
+    if (!shape) return false
+    
+    // Shape is locked if lockedBy exists and is different from current user
+    return !!(shape.lockedBy && shape.lockedBy !== currentUserId)
+  },
+  
+  /**
+   * Release all locks held by a specific user
+   * 
+   * WHY: When a user disconnects or their session ends, we need to
+   * release all shapes they had locked. Otherwise those shapes would
+   * be permanently locked until timeout.
+   * 
+   * HOW: Iterate through all shapes and unlock any locked by this user.
+   * 
+   * @param userId - ID of the user whose locks to release
+   */
+  releaseAllLocks: (userId: string) => {
+    set((state) => {
+      const newShapes = new Map(state.shapes)
+      let hasChanges = false
+      
+      state.shapes.forEach((shape, id) => {
+        if (shape.lockedBy === userId) {
+          newShapes.set(id, {
+            ...shape,
+            lockedBy: null,
+            lockedAt: null,
+          })
+          hasChanges = true
+        }
+      })
+      
+      return hasChanges ? { shapes: newShapes } : state
     })
   },
 }))

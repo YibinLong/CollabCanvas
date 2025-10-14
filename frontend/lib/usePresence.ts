@@ -179,15 +179,25 @@ export function usePresence(
      * 
      * WHY: When users join, leave, or move their cursor, we need to
      * update our local state to re-render the UI.
+     * 
+     * IMPORTANT: Deduplicate by user.id to avoid showing the same user
+     * multiple times when they have multiple tabs open. Each tab gets a
+     * unique clientId from Yjs, but we only want to show each unique user once.
      */
     const handleAwarenessChange = () => {
       const states = awareness.getStates()
-      const allUsers: PresenceUser[] = []
+      
+      // Use a Map to deduplicate by user.id
+      // WHY: Same user can have multiple tabs (multiple clientIds) but should
+      // only appear once in the user list. We keep the most recent state.
+      const userMap = new Map<string, PresenceUser>()
 
       // Convert awareness states to our PresenceUser format
       states.forEach((state, clientId) => {
         if (state.user) {
-          allUsers.push({
+          // Only add/update if this user.id isn't already in the map
+          // or if we want to update their cursor position
+          userMap.set(state.user.id, {
             id: state.user.id,
             name: state.user.name,
             color: state.user.color,
@@ -196,6 +206,8 @@ export function usePresence(
         }
       })
 
+      // Convert Map values back to array
+      const allUsers = Array.from(userMap.values())
       setUsers(allUsers)
     }
 

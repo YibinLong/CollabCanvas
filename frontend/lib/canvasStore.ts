@@ -36,6 +36,7 @@ interface CanvasStore {
   // Actions (methods to update state)
   addShape: (shape: Shape) => void
   updateShape: (id: string, updates: Partial<Shape>) => void
+  updateMultipleShapes: (updates: Array<{ id: string; updates: Partial<Shape> }>) => void
   removeShape: (id: string) => void
   clearShapes: () => void
   
@@ -110,6 +111,32 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
       const newShapes = new Map(state.shapes)
       newShapes.set(id, { ...shape, ...updates } as Shape)
       return { shapes: newShapes }
+    })
+  },
+  
+  /**
+   * Update multiple shapes at once (for multi-select move)
+   * 
+   * WHY: When user has multiple shapes selected and moves them together,
+   * we need to update all of them in a single state update for better performance.
+   * 
+   * HOW: Takes an array of shape IDs and their corresponding updates,
+   * applies all updates in one batch to avoid multiple re-renders.
+   */
+  updateMultipleShapes: (updates: Array<{ id: string; updates: Partial<Shape> }>) => {
+    set((state) => {
+      const newShapes = new Map(state.shapes)
+      let hasChanges = false
+      
+      updates.forEach(({ id, updates: shapeUpdates }) => {
+        const shape = state.shapes.get(id)
+        if (shape) {
+          newShapes.set(id, { ...shape, ...shapeUpdates } as Shape)
+          hasChanges = true
+        }
+      })
+      
+      return hasChanges ? { shapes: newShapes } : state
     })
   },
   

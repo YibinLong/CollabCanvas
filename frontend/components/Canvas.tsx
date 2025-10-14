@@ -44,6 +44,37 @@ function generateId(): string {
 }
 
 /**
+ * Calculate position updates for moving a shape
+ * 
+ * WHY: Different shape types need different properties updated when moved.
+ * Lines have x, y, x2, y2 (start and end points) so both need to move.
+ * Other shapes only have x, y.
+ * 
+ * @param shape - The shape being moved
+ * @param deltaX - How much to move horizontally
+ * @param deltaY - How much to move vertically
+ * @returns Object with the properties that need to be updated
+ */
+function calculateMoveUpdates(shape: Shape, deltaX: number, deltaY: number): Partial<Shape> {
+  const baseUpdate = {
+    x: shape.x + deltaX,
+    y: shape.y + deltaY,
+  }
+  
+  // Lines need both start point (x, y) and end point (x2, y2) moved
+  if (shape.type === 'line') {
+    return {
+      ...baseUpdate,
+      x2: shape.x2 + deltaX,
+      y2: shape.y2 + deltaY,
+    }
+  }
+  
+  // Other shapes only need x, y updated
+  return baseUpdate
+}
+
+/**
  * Canvas Component Props
  * 
  * WHY: Canvas now receives presence data from parent (page.tsx)
@@ -72,6 +103,7 @@ export default function Canvas({ provider, users, updateCursor, currentUser }: C
     clearSelection,
     addShape,
     updateShape,
+    updateMultipleShapes,
     toggleSelection,
     deleteSelected,
     lockShape,
@@ -109,6 +141,7 @@ export default function Canvas({ provider, users, updateCursor, currentUser }: C
     lastY: number
     shapeId?: string
     initialShape?: Shape
+    initialShapes?: Map<string, Shape> // For multi-select move
     handlePosition?: HandlePosition
     creatingShapeId?: string
     justFinishedDrag?: boolean
@@ -282,19 +315,34 @@ export default function Canvas({ provider, users, updateCursor, currentUser }: C
         break
         
       case 'moving':
-        // Update position of shape being moved
-        if (!interactionStateRef.current.shapeId) break
-        
-        const movingShape = shapes.get(interactionStateRef.current.shapeId)
-        if (!movingShape || !interactionStateRef.current.initialShape) break
-        
+        // Update position of shapes being moved (can be single or multiple)
         const deltaShapeX = svgCoords.x - interactionStateRef.current.startX
         const deltaShapeY = svgCoords.y - interactionStateRef.current.startY
         
-        updateShape(interactionStateRef.current.shapeId, {
-          x: interactionStateRef.current.initialShape.x + deltaShapeX,
-          y: interactionStateRef.current.initialShape.y + deltaShapeY,
-        })
+        // If we have multiple shapes (multi-select), move them all together
+        if (interactionStateRef.current.initialShapes && interactionStateRef.current.initialShapes.size > 0) {
+          const updates: Array<{ id: string; updates: Partial<Shape> }> = []
+          
+          interactionStateRef.current.initialShapes.forEach((initialShape, shapeId) => {
+            // Use helper function to calculate correct updates for each shape type
+            const shapeUpdates = calculateMoveUpdates(initialShape, deltaShapeX, deltaShapeY)
+            updates.push({
+              id: shapeId,
+              updates: shapeUpdates
+            })
+          })
+          
+          updateMultipleShapes(updates)
+        }
+        // Single shape move (fallback for compatibility)
+        else if (interactionStateRef.current.shapeId && interactionStateRef.current.initialShape) {
+          const movingShape = shapes.get(interactionStateRef.current.shapeId)
+          if (movingShape) {
+            // Use helper function to calculate correct updates for the shape type
+            const shapeUpdates = calculateMoveUpdates(interactionStateRef.current.initialShape, deltaShapeX, deltaShapeY)
+            updateShape(interactionStateRef.current.shapeId, shapeUpdates)
+          }
+        }
         break
         
       case 'resizing':
@@ -366,9 +414,21 @@ export default function Canvas({ provider, users, updateCursor, currentUser }: C
       }
     }
     
-    // Release lock if we were moving or resizing
-    if ((interactionMode === 'moving' || interactionMode === 'resizing') && 
-        interactionStateRef.current.shapeId) {
+    // Release locks if we were moving or resizing
+    if (interactionMode === 'moving') {
+      // Release locks for all shapes that were being moved
+      if (interactionStateRef.current.initialShapes) {
+        interactionStateRef.current.initialShapes.forEach((_, shapeId) => {
+          unlockShape(shapeId)
+        })
+      }
+      // Or release lock for single shape
+      else if (interactionStateRef.current.shapeId) {
+        unlockShape(interactionStateRef.current.shapeId)
+      }
+    }
+    
+    if (interactionMode === 'resizing' && interactionStateRef.current.shapeId) {
       unlockShape(interactionStateRef.current.shapeId)
     }
     
@@ -582,6 +642,12 @@ export default function Canvas({ provider, users, updateCursor, currentUser }: C
         return
       }
       
+      // If shift key is pressed, don't do anything here - let onClick handle multi-select
+      // This prevents interfering with the toggle selection logic
+      if (e.shiftKey) {
+        return
+      }
+      
       // If not selected, just select it
       if (!isSelected) {
         selectShape(shape.id)
@@ -590,18 +656,44 @@ export default function Canvas({ provider, users, updateCursor, currentUser }: C
       
       // If selected and using select tool, start moving
       if (currentTool === 'select') {
-        // Acquire lock before moving
-        lockShape(shape.id, currentUser.id)
-        
         const svgCoords = screenToSVG(e.clientX, e.clientY)
-        setInteractionMode('moving')
-        interactionStateRef.current = {
-          startX: svgCoords.x,
-          startY: svgCoords.y,
-          lastX: svgCoords.x,
-          lastY: svgCoords.y,
-          shapeId: shape.id,
-          initialShape: { ...shape },
+        
+        // If multiple shapes are selected, prepare to move all of them together
+        if (selectedIds.length > 1) {
+          // Acquire locks for all selected shapes
+          const initialShapesMap = new Map<string, Shape>()
+          
+          selectedIds.forEach(id => {
+            const selectedShape = shapes.get(id)
+            if (selectedShape && !isShapeLocked(id, currentUser.id)) {
+              lockShape(id, currentUser.id)
+              initialShapesMap.set(id, { ...selectedShape })
+            }
+          })
+          
+          setInteractionMode('moving')
+          interactionStateRef.current = {
+            startX: svgCoords.x,
+            startY: svgCoords.y,
+            lastX: svgCoords.x,
+            lastY: svgCoords.y,
+            initialShapes: initialShapesMap,
+          }
+        } 
+        // Single shape move
+        else {
+          // Acquire lock before moving
+          lockShape(shape.id, currentUser.id)
+          
+          setInteractionMode('moving')
+          interactionStateRef.current = {
+            startX: svgCoords.x,
+            startY: svgCoords.y,
+            lastX: svgCoords.x,
+            lastY: svgCoords.y,
+            shapeId: shape.id,
+            initialShape: { ...shape },
+          }
         }
       }
     }

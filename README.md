@@ -119,12 +119,15 @@ See [Frontend README](./frontend/README.md) and [Backend README](./backend/READM
 ## 📖 Documentation
 
 ### Essential Docs
+- **[START_HERE.md](./docs/guides/START_HERE.md)** - New user entry point
 - **[PRD.md](./PRD.md)** - Complete product requirements
 - **[TASK_LIST.md](./TASK_LIST.md)** - 39 PRs from setup to production
 - **[Documentation Index](./docs/INDEX.md)** - Complete documentation map
 
 ### Quick Links
 - **[Quick Start Guide](./docs/guides/QUICK_START.md)** - Get up and running fast
+- **[Setup Database](./docs/guides/SETUP_DATABASE.md)** - Database configuration
+- **[Troubleshooting](./docs/guides/TROUBLESHOOTING.md)** - Common issues and fixes
 - **[Testing Guide](./docs/guides/TESTING_GUIDE.md)** - How to test the project
 - **[TDD Workflow](./docs/guides/TDD_WORKFLOW.md)** - Test-driven development approach
 - **[Deployment Guide](./docs/deployment/DEPLOYMENT_GUIDE.md)** - How to deploy
@@ -235,6 +238,7 @@ MIT License - See LICENSE file for details
 2. Read component README files for architectural decisions
 3. Look at inline code comments for implementation details
 4. Review [TASK_LIST.md](./TASK_LIST.md) to see what's coming next
+5. See [Troubleshooting](./docs/guides/TROUBLESHOOTING.md) for common issues
 
 ---
 

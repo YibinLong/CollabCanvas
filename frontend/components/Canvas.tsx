@@ -808,19 +808,31 @@ export default function Canvas({ provider, users, updateCursor, currentUser }: C
         return
       }
       
-      // If not selected, select it first
-      if (!isSelected) {
-        selectShape(shape.id)
-        return
-      }
-      
-      // If selected (regardless of tool), start moving
-      // WHY: Clicking and dragging an existing shape should move it, even if a creation tool is active.
-      // This is more intuitive than creating a new shape on top of an existing one.
+      // Get SVG coordinates for starting the move
       const svgCoords = screenToSVG(e.clientX, e.clientY)
       
-      // If multiple shapes are selected, prepare to move all of them together
-      if (selectedIds.length > 1) {
+      // NEW BEHAVIOR: Click on shape immediately starts moving it
+      // WHY: More intuitive - no need to click twice (once to select, once to move)
+      // The shape will be selected AND moved in one action
+      
+      // If not selected, select it and start moving just this shape
+      if (!isSelected) {
+        selectShape(shape.id)
+        // Move just this single shape (selectedIds won't update until next render)
+        lockShape(shape.id, currentUser.id)
+        
+        setInteractionMode('moving')
+        interactionStateRef.current = {
+          startX: svgCoords.x,
+          startY: svgCoords.y,
+          lastX: svgCoords.x,
+          lastY: svgCoords.y,
+          shapeId: shape.id,
+          initialShape: { ...shape },
+        }
+      }
+      // If already selected and multiple shapes are selected, move all of them together
+      else if (selectedIds.length > 1) {
         // Acquire locks for all selected shapes
         const initialShapesMap = new Map<string, Shape>()
         
@@ -841,7 +853,7 @@ export default function Canvas({ provider, users, updateCursor, currentUser }: C
           initialShapes: initialShapesMap,
         }
       } 
-      // Single shape move
+      // Single shape move (already selected)
       else {
         // Acquire lock before moving
         lockShape(shape.id, currentUser.id)

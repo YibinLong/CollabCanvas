@@ -156,14 +156,20 @@ app.use(
  * 
  * WHY: Set up the WebSocket server for real-time collaboration BEFORE starting the HTTP server.
  * This ensures WebSocket connections can be accepted as soon as the server starts.
+ * 
+ * PERSISTENCE ENABLED: Canvas state is now automatically saved to PostgreSQL:
+ * - Loads saved state when users join a room
+ * - Auto-saves every 10 seconds while users are editing
+ * - Saves when the last user leaves a room
+ * - Ensures work persists even if all users disconnect for days
  */
 const wss = createWebSocketServer(httpServer, {
   pingInterval: 30000, // 30 seconds
   pongTimeout: 5000, // 5 seconds
-  enablePersistence: false, // Will be enabled in Phase 4
+  enablePersistence: true, // ✅ ENABLED - Canvas state persists to database
 });
 
-console.log('✓ WebSocket server initialized');
+console.log('✓ WebSocket server initialized with persistence');
 
 /**
  * Start Server

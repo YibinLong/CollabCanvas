@@ -30,6 +30,13 @@ import * as Y from 'yjs'
 // @ts-ignore - y-websocket doesn't have type definitions
 import { setupWSConnection } from 'y-websocket/bin/utils'
 import { verifyToken } from '../utils/supabase'
+import { 
+  loadYjsDocument, 
+  saveYjsDocument, 
+  handleClientDisconnect, 
+  startAutoSave, 
+  stopAutoSave 
+} from './yjsPersistence'
 
 /**
  * WebSocket Server Configuration
@@ -56,6 +63,7 @@ interface Room {
   doc: Y.Doc
   clients: Set<WebSocket>
   lastUpdate: number
+  autoSaveInterval?: NodeJS.Timeout // For periodic saves to database
 }
 
 /**
@@ -63,6 +71,12 @@ interface Room {
  * WHY: We need to track all active rooms and their documents
  */
 const rooms = new Map<string, Room>()
+
+/**
+ * Global persistence flag
+ * WHY: Store config so other functions can check if persistence is enabled
+ */
+let persistenceEnabled = false
 
 /**
  * Create WebSocket Server
@@ -85,6 +99,10 @@ export function createWebSocketServer(
     enablePersistence = false,
     authenticate,
   } = config
+
+  // Store persistence flag globally
+  persistenceEnabled = enablePersistence
+  console.log(`[WebSocket] Persistence ${enablePersistence ? 'ENABLED' : 'DISABLED'}`)
 
   /**
    * Create WebSocket server attached to HTTP server
@@ -169,9 +187,9 @@ export function createWebSocketServer(
     }
 
     /**
-     * Get or create the Yjs document for this room
+     * Get or create the Yjs document for this room (now async for persistence)
      */
-    const room = getOrCreateRoom(roomName)
+    const room = await getOrCreateRoom(roomName)
     
     /**
      * Track unique users (y-websocket creates 2 connections per user: sync + awareness)
@@ -206,7 +224,7 @@ export function createWebSocketServer(
     /**
      * Handle disconnection
      */
-    ws.on('close', () => {
+    ws.on('close', async () => {
       room.clients.delete(ws)
       
       // Check if this was the user's last connection
@@ -222,8 +240,26 @@ export function createWebSocketServer(
         console.log(`[WS] 👋 ${client.userEmail} left ${roomName} (${remainingUsers.size} users online)`)
       }
       
+      // Save to database when room becomes empty (if persistence enabled)
       if (room.clients.size === 0) {
         console.log(`[WS] 📭 Room ${roomName} is now empty`)
+        
+        if (persistenceEnabled) {
+          try {
+            console.log(`[WS] 💾 Saving room ${roomName} to database...`)
+            await saveYjsDocument(roomName, room.doc)
+            
+            // Stop autosave for this room
+            if (room.autoSaveInterval) {
+              stopAutoSave(room.autoSaveInterval)
+              room.autoSaveInterval = undefined
+            }
+            
+            console.log(`[WS] ✅ Room ${roomName} saved successfully`)
+          } catch (error) {
+            console.error(`[WS] ❌ Error saving room ${roomName}:`, error)
+          }
+        }
       }
     })
 
@@ -276,15 +312,19 @@ export function createWebSocketServer(
  * WHY: Rooms are created on-demand when the first client joins.
  * This saves memory - we only have rooms for active documents.
  * 
+ * NOW WITH PERSISTENCE: When creating a room, we load the saved state from
+ * the database so users see their previous work.
+ * 
  * @param roomName - Unique room identifier (usually document ID)
  * @returns Room object
  */
-function getOrCreateRoom(roomName: string): Room {
+async function getOrCreateRoom(roomName: string): Promise<Room> {
   let room = rooms.get(roomName)
   
   if (!room) {
-    console.log(`[WS] 🚪 Created room: ${roomName}`)
+    console.log(`[WS] 🚪 Creating room: ${roomName}`)
     
+    // Create the room structure
     room = {
       name: roomName,
       doc: new Y.Doc(),
@@ -292,11 +332,29 @@ function getOrCreateRoom(roomName: string): Room {
       lastUpdate: Date.now(),
     }
     
-    rooms.set(roomName, room)
+    // Load persisted document state if persistence is enabled
+    if (persistenceEnabled) {
+      try {
+        console.log(`[WS] 📖 Loading document ${roomName} from database...`)
+        const loadedDoc = await loadYjsDocument(roomName)
+        
+        // Apply the loaded state to our room's document
+        const state = Y.encodeStateAsUpdate(loadedDoc)
+        Y.applyUpdate(room.doc, state)
+        
+        console.log(`[WS] ✅ Document ${roomName} loaded successfully`)
+        
+        // Start autosave (save every 10 seconds)
+        room.autoSaveInterval = startAutoSave(roomName, room.doc, 10000)
+        console.log(`[WS] ⏰ Auto-save started for ${roomName}`)
+      } catch (error) {
+        console.error(`[WS] ⚠️  Error loading document ${roomName}:`, error)
+        console.log(`[WS] 📄 Starting with empty document`)
+        // Continue with empty document - don't fail the connection
+      }
+    }
     
-    // Load persisted document state if available
-    // This will be implemented in Phase 4 (Persistence)
-    // await loadDocument(roomName, room.doc)
+    rooms.set(roomName, room)
   }
   
   return room
@@ -361,11 +419,27 @@ export function getServerStats() {
  * Close a room and disconnect all clients
  * 
  * WHY: Useful for admin operations (force-close a document, etc.)
+ * NOW WITH PERSISTENCE: Saves the document before closing the room.
  */
-export function closeRoom(roomName: string) {
+export async function closeRoom(roomName: string) {
   const room = rooms.get(roomName)
   
   if (room) {
+    // Save to database if persistence is enabled
+    if (persistenceEnabled) {
+      try {
+        console.log(`[WS] 💾 Saving room ${roomName} before closing...`)
+        await saveYjsDocument(roomName, room.doc)
+        
+        // Stop autosave
+        if (room.autoSaveInterval) {
+          stopAutoSave(room.autoSaveInterval)
+        }
+      } catch (error) {
+        console.error(`[WS] ❌ Error saving room ${roomName}:`, error)
+      }
+    }
+    
     // Close all client connections
     room.clients.forEach((client) => {
       client.close(1000, 'Room closed by server')

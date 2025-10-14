@@ -20,7 +20,9 @@
     "db:push": "prisma db push",
     "db:reset": "prisma migrate reset",
     "test:db": "tsx src/utils/test-db-connection.ts",
-    "verify:data": "tsx src/utils/verify-data.ts"
+    "verify:data": "tsx src/utils/verify-data.ts",
+    "canvas:create": "tsx prisma/create-shared-canvas.ts",
+    "canvas:check": "tsx prisma/check-canvas-state.ts"
   },
   "dependencies": {
     "@prisma/client": "^5.7.0",

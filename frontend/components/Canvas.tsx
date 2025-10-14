@@ -226,13 +226,19 @@ export default function Canvas({ provider, users, updateCursor, currentUser }: C
    * 
    * WHY: Mouse events give us screen (pixel) coordinates, but we need
    * to convert them to SVG world coordinates considering pan/zoom.
+   * 
+   * HOW: Uses the actual client dimensions and current viewport state
+   * to accurately map screen pixels to SVG coordinate space.
    */
   const screenToSVG = (screenX: number, screenY: number): { x: number; y: number } => {
     if (!svgRef.current) return { x: screenX, y: screenY }
     
     const rect = svgRef.current.getBoundingClientRect()
-    const viewBoxWidth = 1920 / viewport.zoom
-    const viewBoxHeight = 1080 / viewport.zoom
+    const actualWidth = clientWidth ?? BASE_VIEWPORT_WIDTH
+    const actualHeight = clientHeight ?? BASE_VIEWPORT_HEIGHT
+    
+    const viewBoxWidth = actualWidth / viewport.zoom
+    const viewBoxHeight = actualHeight / viewport.zoom
     const viewBoxX = -viewport.x / viewport.zoom
     const viewBoxY = -viewport.y / viewport.zoom
     
@@ -251,15 +257,39 @@ export default function Canvas({ provider, users, updateCursor, currentUser }: C
   const [clientWidth, setClientWidth] = useState<number | null>(null)
   const [clientHeight, setClientHeight] = useState<number | null>(null)
 
+  /**
+   * Initialize viewport dimensions and centering
+   * 
+   * WHY: We need to measure the actual available canvas space and center
+   * the grid properly within that space, accounting for any padding/offsets.
+   * 
+   * HOW: Use ResizeObserver to track size changes and update viewport accordingly.
+   * This ensures proper centering even when browser window is resized or zoomed.
+   */
   useEffect(() => {
     const canvasContainer = svgRef.current?.parentElement
     if (!canvasContainer) return
 
-    const rect = canvasContainer.getBoundingClientRect()
-    setClientWidth(rect.width)
-    setClientHeight(rect.height)
+    const updateDimensions = () => {
+      const rect = canvasContainer.getBoundingClientRect()
+      setClientWidth(rect.width)
+      setClientHeight(rect.height)
+      resetViewport(DEFAULT_VIEWPORT_ZOOM, { width: rect.width, height: rect.height })
+    }
 
-    resetViewport(DEFAULT_VIEWPORT_ZOOM, { width: rect.width, height: rect.height })
+    // Initial measurement
+    updateDimensions()
+
+    // Watch for size changes (window resize, zoom, etc.)
+    const resizeObserver = new ResizeObserver(() => {
+      updateDimensions()
+    })
+
+    resizeObserver.observe(canvasContainer)
+
+    return () => {
+      resizeObserver.disconnect()
+    }
   }, [resetViewport])
   
   /**
@@ -899,8 +929,13 @@ export default function Canvas({ provider, users, updateCursor, currentUser }: C
   }
   
   // Calculate SVG viewBox
-  const viewBoxWidth = 1920 / viewport.zoom
-  const viewBoxHeight = 1080 / viewport.zoom
+  // WHY: The viewBox determines what portion of the SVG coordinate space is visible
+  // We use clientWidth/clientHeight (actual canvas dimensions) divided by zoom
+  const actualWidth = clientWidth ?? BASE_VIEWPORT_WIDTH
+  const actualHeight = clientHeight ?? BASE_VIEWPORT_HEIGHT
+  
+  const viewBoxWidth = actualWidth / viewport.zoom
+  const viewBoxHeight = actualHeight / viewport.zoom
   const viewBoxX = -viewport.x / viewport.zoom
   const viewBoxY = -viewport.y / viewport.zoom
   
@@ -918,31 +953,6 @@ export default function Canvas({ provider, users, updateCursor, currentUser }: C
     <div 
       className="w-full h-full overflow-hidden bg-gray-100"
       style={{ cursor: cursorStyle }}
-      ref={(node) => {
-        if (!node) {
-          return
-        }
-
-        const updateDimensions = () => {
-          const rect = node.getBoundingClientRect()
-          if (rect.width !== clientWidth || rect.height !== clientHeight) {
-            setClientWidth(rect.width)
-            setClientHeight(rect.height)
-          }
-        }
-
-        updateDimensions()
-
-        const resizeObserver = new ResizeObserver(() => {
-          updateDimensions()
-        })
-
-        resizeObserver.observe(node)
-
-        return () => {
-          resizeObserver.disconnect()
-        }
-      }}
     >
       <svg
         ref={svgRef}
@@ -1112,6 +1122,8 @@ export default function Canvas({ provider, users, updateCursor, currentUser }: C
         currentUserId={currentUser.id}
         svgRef={svgRef}
         viewport={viewport}
+        canvasWidth={clientWidth ?? undefined}
+        canvasHeight={clientHeight ?? undefined}
       />
     </div>
   )

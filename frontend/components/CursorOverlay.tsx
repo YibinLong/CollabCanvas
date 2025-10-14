@@ -55,6 +55,8 @@ interface CursorOverlayProps {
   currentUserId?: string
   svgRef: RefObject<SVGSVGElement>
   viewport: Viewport
+  canvasWidth?: number  // Actual canvas width in pixels
+  canvasHeight?: number // Actual canvas height in pixels
 }
 
 /**
@@ -66,15 +68,21 @@ interface CursorOverlayProps {
  * @param user - User data including SVG position and color
  * @param svgRef - Reference to the SVG element for coordinate conversion
  * @param viewport - Current viewport state (pan/zoom)
+ * @param canvasWidth - Actual canvas width (for accurate coordinate conversion)
+ * @param canvasHeight - Actual canvas height (for accurate coordinate conversion)
  */
 function UserCursor({ 
   user, 
   svgRef, 
-  viewport 
+  viewport,
+  canvasWidth,
+  canvasHeight
 }: { 
   user: PresenceUser
   svgRef: RefObject<SVGSVGElement>
   viewport: Viewport
+  canvasWidth?: number
+  canvasHeight?: number
 }) {
   // Don't render if no cursor or cursor is null (user's mouse left the canvas)
   if (!user.cursor || user.cursor.x === null || user.cursor.y === null) return null
@@ -88,9 +96,11 @@ function UserCursor({
    * 
    * HOW: 
    * 1. Get the SVG element's bounding rectangle on screen
-   * 2. Calculate viewBox dimensions based on zoom
+   * 2. Calculate viewBox dimensions based on zoom AND actual canvas size
    * 3. Convert SVG coords to normalized coords (0-1) within viewBox
    * 4. Convert normalized coords to screen pixels within bounding rect
+   * 
+   * CRITICAL: Must use the same dimensions as Canvas.tsx for accurate sync!
    */
   const svgToScreen = (svgX: number, svgY: number): { x: number; y: number } => {
     if (!svgRef.current) return { x: svgX, y: svgY }
@@ -102,9 +112,14 @@ function UserCursor({
       return { x: svgX, y: svgY }
     }
     
-    // Calculate viewBox dimensions
-    const viewBoxWidth = 1920 / viewport.zoom
-    const viewBoxHeight = 1080 / viewport.zoom
+    // Use actual canvas dimensions (same as Canvas.tsx)
+    // Fall back to rect dimensions if not provided
+    const actualWidth = canvasWidth ?? rect.width
+    const actualHeight = canvasHeight ?? rect.height
+    
+    // Calculate viewBox dimensions (must match Canvas.tsx exactly!)
+    const viewBoxWidth = actualWidth / viewport.zoom
+    const viewBoxHeight = actualHeight / viewport.zoom
     const viewBoxX = -viewport.x / viewport.zoom
     const viewBoxY = -viewport.y / viewport.zoom
     
@@ -184,12 +199,16 @@ function UserCursor({
  * @param currentUserId - ID of the current user (to hide their cursor)
  * @param svgRef - Reference to SVG element for coordinate conversion
  * @param viewport - Current viewport state for coordinate conversion
+ * @param canvasWidth - Actual canvas width (for accurate coordinate conversion)
+ * @param canvasHeight - Actual canvas height (for accurate coordinate conversion)
  */
 export default function CursorOverlay({ 
   users, 
   currentUserId, 
   svgRef, 
-  viewport 
+  viewport,
+  canvasWidth,
+  canvasHeight
 }: CursorOverlayProps) {
   // Filter out current user (they see their native cursor instead)
   const otherUsers = users.filter(user => user.id !== currentUserId)
@@ -203,6 +222,8 @@ export default function CursorOverlay({
           user={user} 
           svgRef={svgRef}
           viewport={viewport}
+          canvasWidth={canvasWidth}
+          canvasHeight={canvasHeight}
         />
       ))}
     </>

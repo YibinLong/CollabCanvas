@@ -12,7 +12,7 @@
  * 4. Manages user colors and names
  * 5. Handles join/leave events
  * 
- * PHASE 5: Now uses authenticated user identity (name/email) ✅
+ * Uses authenticated user identity (name/email) for personalized presence.
  * 
  * HOW TO USE:
  * const { users, updateCursor } = usePresence(provider, currentUser)

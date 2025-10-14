@@ -185,12 +185,12 @@ export default function SignupPage() {
           </Link>
         </div>
 
-        {/* Demo Note */}
+        {/* Info Note */}
         <div className="mt-8 p-4 bg-gray-700/50 rounded-lg border border-gray-600">
           <p className="text-xs text-gray-400 text-center">
-            🎨 <strong>Phase 5:</strong> Authentication is now live!
+            🎨 Join CollabCanvas today
             <br />
-            Your account will allow you to create and collaborate on designs.
+            Create and collaborate on designs in real-time with your team.
           </p>
         </div>
       </div>

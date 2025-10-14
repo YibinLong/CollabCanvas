@@ -148,12 +148,12 @@ export default function LoginPage() {
           </Link>
         </div>
 
-        {/* Demo Note */}
+        {/* Info Note */}
         <div className="mt-8 p-4 bg-gray-700/50 rounded-lg border border-gray-600">
           <p className="text-xs text-gray-400 text-center">
-            🎨 <strong>Phase 5:</strong> Authentication is now live!
+            🎨 Secure collaborative design tool
             <br />
-            Create an account or login to access the canvas.
+            Create an account or login to start designing.
           </p>
         </div>
       </div>

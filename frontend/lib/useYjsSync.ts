@@ -111,7 +111,7 @@ export function useYjsSync(
        * It automatically sends updates when we change the document,
        * and receives updates from other users.
        * 
-       * PHASE 5: Now includes JWT token for authentication ✅
+       * Authentication: Uses JWT token for secure WebSocket connections
        * 
        * HOW IT WORKS:
        * - wsUrl: Server address (e.g., 'ws://localhost:4000')

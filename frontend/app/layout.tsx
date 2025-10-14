@@ -21,8 +21,6 @@ export const metadata: Metadata = {
  * - AuthProvider: Makes authentication available to all pages/components
  * 
  * WHAT: The {children} prop will be replaced with each page's content
- * 
- * PHASE 5: Now includes AuthProvider so any component can use useAuth()
  */
 export default function RootLayout({
   children,

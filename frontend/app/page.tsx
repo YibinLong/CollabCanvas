@@ -5,9 +5,7 @@
  * It's a playground to try out drawing, selecting, moving, deleting, and collaborating.
  * 
  * WHAT: Shows the Canvas component with a Toolbar, UserAvatars showing live presence.
- * 
- * PHASE 3: Now includes real-time collaboration features!
- * PHASE 5: Now includes authentication protection!
+ * Features include real-time collaboration and secure authentication.
  */
 
 'use client'
@@ -105,7 +103,7 @@ export default function Home() {
       <div className="absolute top-0 left-0 right-0 bg-gray-800 border-b border-gray-700 px-4 py-2 z-10 flex items-center justify-between">
         <div>
           <h1 className="text-white font-semibold">
-            CollabCanvas - Phase 5: Authentication! 🔐
+            CollabCanvas
           </h1>
           <p className="text-gray-400 text-sm">
             Logged in as: <span className="text-blue-400">{user.email}</span>

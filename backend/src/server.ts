@@ -14,12 +14,22 @@ import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import dotenv from 'dotenv';
+import http from 'http';
+import { createWebSocketServer, getServerStats } from './services/websocketServer';
 
 // Load environment variables from .env file
 dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 4000;
+
+/**
+ * Create HTTP server
+ * 
+ * WHY: We need an HTTP server that both Express and WebSocket can share.
+ * This allows them to run on the same port, which is cleaner and easier to deploy.
+ */
+const httpServer = http.createServer(app);
 
 /**
  * Middleware Setup
@@ -63,6 +73,7 @@ app.get('/health', (req, res) => {
     status: 'ok',
     timestamp: new Date().toISOString(),
     uptime: process.uptime(),
+    websocket: getServerStats(),
   });
 });
 
@@ -114,19 +125,65 @@ app.use(
 );
 
 /**
+ * Initialize WebSocket Server
+ * 
+ * WHY: Set up the WebSocket server for real-time collaboration BEFORE starting the HTTP server.
+ * This ensures WebSocket connections can be accepted as soon as the server starts.
+ */
+const wss = createWebSocketServer(httpServer, {
+  pingInterval: 30000, // 30 seconds
+  pongTimeout: 5000, // 5 seconds
+  enablePersistence: false, // Will be enabled in Phase 4
+});
+
+console.log('✓ WebSocket server initialized');
+
+/**
  * Start Server
  * 
- * WHY: Begins listening for HTTP requests on the specified port.
+ * WHY: Begins listening for HTTP and WebSocket requests on the specified port.
+ * 
+ * IMPORTANT: We use httpServer.listen() instead of app.listen() because
+ * the WebSocket server is attached to httpServer, not the Express app directly.
  */
-app.listen(PORT, () => {
+httpServer.listen(PORT, () => {
   console.log(`\n🚀 Server running on http://localhost:${PORT}`);
+  console.log(`🔌 WebSocket server running on ws://localhost:${PORT}`);
   console.log(`📊 Health check: http://localhost:${PORT}/health`);
   console.log(`\n✓ Backend setup complete!\n`);
 });
 
-// Handle graceful shutdown
+/**
+ * Handle graceful shutdown
+ * 
+ * WHY: When the server is stopped (Ctrl+C, deployment update, etc.),
+ * we want to close all connections cleanly before exiting.
+ */
 process.on('SIGTERM', () => {
   console.log('SIGTERM received, shutting down gracefully...');
-  process.exit(0);
+  
+  // Close HTTP server (stops accepting new connections)
+  httpServer.close(() => {
+    console.log('HTTP server closed');
+  });
+  
+  // Close WebSocket server
+  wss.close(() => {
+    console.log('WebSocket server closed');
+    process.exit(0);
+  });
+});
+
+process.on('SIGINT', () => {
+  console.log('\nSIGINT received, shutting down gracefully...');
+  
+  httpServer.close(() => {
+    console.log('HTTP server closed');
+  });
+  
+  wss.close(() => {
+    console.log('WebSocket server closed');
+    process.exit(0);
+  });
 });
 

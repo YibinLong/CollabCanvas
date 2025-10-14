@@ -4,7 +4,7 @@
  * WHY: This page lets you test all canvas features including REAL-TIME COLLABORATION!
  * It's a playground to try out drawing, selecting, moving, deleting, and collaborating.
  * 
- * WHAT: Shows the Canvas component with a Toolbar, ConnectionStatus, and PresenceList.
+ * WHAT: Shows the Canvas component with a Toolbar, UserAvatars showing live presence.
  * 
  * PHASE 3: Now includes real-time collaboration features!
  * PHASE 5: Now includes authentication protection!
@@ -12,18 +12,51 @@
 
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useEffect, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import Canvas from '@/components/Canvas'
 import Toolbar from '@/components/Toolbar'
-import ConnectionStatus from '@/components/ConnectionStatus'
-import PresenceList from '@/components/PresenceList'
+import UserAvatars from '@/components/UserAvatars'
 import { useAuth } from '@/lib/AuthContext'
+import { useYjsSync } from '@/lib/useYjsSync'
+import { usePresence } from '@/lib/usePresence'
 
 export default function Home() {
   const router = useRouter()
-  const { user, loading, logout } = useAuth()
-  const [showPresence, setShowPresence] = useState(false)
+  const { user, userMetadata, loading, logout } = useAuth()
+
+  /**
+   * Real-time collaboration setup
+   * 
+   * WHY: We need to set up Yjs sync and presence at the page level
+   * so we can display user avatars in the header while Canvas uses
+   * the same presence data for cursor tracking.
+   * 
+   * NOTE: These hooks must be called unconditionally (React rules)
+   * even if user is not logged in yet. The hooks handle null user gracefully.
+   */
+  const documentId = 'test-document-123'
+  const { connected, status, provider } = useYjsSync(documentId, undefined, !!user)
+  
+  // Create currentUser object from authenticated user
+  const currentUser = useMemo(() => {
+    if (!user) {
+      return {
+        id: 'anonymous',
+        name: 'Anonymous',
+        color: '#9ca3af',
+      }
+    }
+    
+    return {
+      id: user.id,
+      name: userMetadata?.name || user.email || 'User',
+      color: '#3b82f6',
+    }
+  }, [user, userMetadata])
+  
+  // Get presence data (users and cursor update function)
+  const { users, updateCursor } = usePresence(provider, currentUser)
 
   /**
    * Protected Route Logic
@@ -79,13 +112,10 @@ export default function Home() {
           </p>
         </div>
         
-        <div className="flex items-center gap-3">
-          <button
-            onClick={() => setShowPresence(!showPresence)}
-            className="text-white text-sm px-3 py-1 bg-gray-700 hover:bg-gray-600 rounded"
-          >
-            {showPresence ? 'Hide' : 'Show'} Users
-          </button>
+        <div className="flex items-center gap-4">
+          {/* Figma-style user avatars showing who's present */}
+          <UserAvatars users={users} currentUserId={currentUser.id} />
+          
           <button
             onClick={handleLogout}
             className="text-white text-sm px-3 py-1 bg-red-600 hover:bg-red-700 rounded"
@@ -93,9 +123,11 @@ export default function Home() {
           >
             Logout
           </button>
-          {/* Connection status will be wired up when Canvas exports it */}
-          <div className="text-white text-xs">
-            ✅ Connected (mock)
+          
+          {/* Connection status indicator */}
+          <div className={`text-xs flex items-center gap-1 ${connected ? 'text-green-400' : 'text-red-400'}`}>
+            <div className={`w-2 h-2 rounded-full ${connected ? 'bg-green-400' : 'bg-red-400'}`} />
+            {connected ? 'Connected' : 'Disconnected'}
           </div>
         </div>
       </div>
@@ -105,9 +137,14 @@ export default function Home() {
         <Toolbar />
       </div>
 
-      {/* Canvas - fills the screen */}
+      {/* Canvas - fills the screen, pass presence props */}
       <div className="w-full h-full pt-16">
-        <Canvas />
+        <Canvas 
+          provider={provider}
+          users={users}
+          updateCursor={updateCursor}
+          currentUser={currentUser}
+        />
       </div>
 
       {/* Help Panel */}

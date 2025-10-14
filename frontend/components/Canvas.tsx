@@ -22,9 +22,9 @@
 
 import { useEffect, useRef, useState, useCallback, useMemo } from 'react'
 import { useCanvasStore } from '@/lib/canvasStore'
-import { useYjsSync } from '@/lib/useYjsSync'
-import { usePresence, throttle } from '@/lib/usePresence'
-import { useAuth } from '@/lib/AuthContext'
+import { WebsocketProvider } from 'y-websocket'
+import type { CurrentUser } from '@/lib/usePresence'
+import type { PresenceUser } from './CursorOverlay'
 import Rectangle from './shapes/Rectangle'
 import Circle from './shapes/Circle'
 import Line from './shapes/Line'
@@ -44,9 +44,23 @@ function generateId(): string {
 }
 
 /**
+ * Canvas Component Props
+ * 
+ * WHY: Canvas now receives presence data from parent (page.tsx)
+ * so that user avatars can be displayed in the header while
+ * Canvas still tracks cursor movements.
+ */
+interface CanvasProps {
+  provider: WebsocketProvider | null
+  users: PresenceUser[]
+  updateCursor: (x: number | null, y: number | null) => void
+  currentUser: CurrentUser
+}
+
+/**
  * Canvas Component
  */
-export default function Canvas() {
+export default function Canvas({ provider, users, updateCursor, currentUser }: CanvasProps) {
   const { 
     shapes, 
     viewport, 
@@ -63,45 +77,18 @@ export default function Canvas() {
   } = useCanvasStore()
   
   /**
-   * Get authenticated user info (PR #23 - NEW!)
+   * Presence and Collaboration
    * 
-   * WHY: Use real user identity from authentication instead of mock data
-   * IMPORTANT: Must be called BEFORE useYjsSync to check if user is logged in
+   * WHY: Canvas receives presence data as props from parent (page.tsx).
+   * This allows user avatars to be displayed in the header while Canvas
+   * handles cursor tracking and multiplayer cursors overlay.
    * 
-   * UPDATED: Now also gets userMetadata which includes the user's name
+   * WHAT WE RECEIVE:
+   * - provider: WebSocket connection for Yjs sync
+   * - users: Array of all connected users
+   * - updateCursor: Function to broadcast cursor position
+   * - currentUser: Info about the logged-in user
    */
-  const { user, userMetadata } = useAuth()
-  
-  /**
-   * Real-time collaboration hooks (PR #23 - UPDATED!)
-   * 
-   * WHY: These hooks enable multiple users to work together in real-time.
-   * - useYjsSync: Syncs shapes between all connected users (only connects if user is logged in)
-   * - usePresence: Tracks cursor positions and user presence
-   * 
-   * PHASE 5: Now uses authenticated user identity ✅
-   */
-  const documentId = 'test-document-123' // TODO: Phase 4 will make this dynamic
-  const { connected, status, provider } = useYjsSync(documentId, undefined, !!user)
-  
-  // Create currentUser object from authenticated user
-  const currentUser = useMemo(() => {
-    if (!user) {
-      return {
-        id: 'anonymous',
-        name: 'Anonymous',
-        color: '#9ca3af',
-      }
-    }
-    
-    return {
-      id: user.id,
-      name: userMetadata?.name || user.email || 'User', // Use name from metadata, fallback to email
-      color: '#3b82f6', // Color will be assigned by usePresence based on user ID
-    }
-  }, [user, userMetadata])
-  
-  const { users, updateCursor } = usePresence(provider, currentUser)
   
   // Track if mouse is currently over the canvas
   const [isMouseOverCanvas, setIsMouseOverCanvas] = useState(false)

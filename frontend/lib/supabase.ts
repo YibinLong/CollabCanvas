@@ -189,7 +189,7 @@ export async function signOutOthers() {
 export async function getUserMetadata(accessToken?: string) {
   try {
     // Reuse provided token when available to avoid unnecessary refresh calls
-    let token = accessToken
+    let token: string | null | undefined = accessToken
 
     if (!token) {
       token = await getAuthToken()

@@ -17,6 +17,7 @@ import dotenv from 'dotenv';
 import http from 'http';
 import { createWebSocketServer, getServerStats } from './services/websocketServer';
 import documentRoutes from './routes/documentRoutes';
+import authRoutes from './routes/authRoutes';
 
 // Load environment variables from .env file
 dotenv.config();
@@ -94,11 +95,15 @@ app.get('/', (req: Request, res: Response) => {
 /**
  * API Routes
  * 
- * WHY: Organizes endpoints by feature (documents, AI, etc.)
+ * WHY: Organizes endpoints by feature (documents, auth, AI, etc.)
  * WHAT: Each feature has its own router module:
+ * - /api/auth - Authentication (signup, login, logout) (PR #21 ✅)
  * - /api/documents - Document CRUD operations (PR #17 ✅)
  * - /api/ai - AI command interpretation (Phase 6)
  */
+
+// Authentication routes (PR #21)
+app.use('/api/auth', authRoutes);
 
 // Document management routes (PR #17)
 app.use('/api/documents', documentRoutes);

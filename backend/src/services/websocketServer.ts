@@ -19,11 +19,17 @@
 
 import * as http from 'http'
 import WebSocket from 'ws'
-type ManagedWebSocket = WebSocket & { isAlive?: boolean }
+import { URL } from 'url'
+type ManagedWebSocket = WebSocket & { 
+  isAlive?: boolean
+  userId?: string  // Store authenticated user ID
+  userEmail?: string  // Store user email for presence
+}
 
 import * as Y from 'yjs'
 // @ts-ignore - y-websocket doesn't have type definitions
 import { setupWSConnection } from 'y-websocket/bin/utils'
+import { verifyToken } from '../utils/supabase'
 
 /**
  * WebSocket Server Configuration
@@ -99,7 +105,7 @@ export function createWebSocketServer(
   console.log('[WebSocket] Server created')
 
   /**
-   * Handle new client connections using y-websocket utilities
+   * Handle new client connections with authentication (PR #23 - UPDATED!)
    * 
    * WHY: The y-websocket package provides a `setupWSConnection` utility
    * that properly handles all the protocol details, including:
@@ -108,22 +114,55 @@ export function createWebSocketServer(
    * - Room management
    * - Proper encoding/decoding
    * 
-   * This is much more reliable than manually implementing the protocol.
+   * PHASE 5: Now includes JWT authentication for WebSocket connections ✅
    */
-  wss.on('connection', (ws: WebSocket, request: http.IncomingMessage) => {
+  wss.on('connection', async (ws: WebSocket, request: http.IncomingMessage) => {
     const client = ws as ManagedWebSocket
     client.isAlive = true
 
     console.log('[WebSocket] New connection from', request.socket.remoteAddress)
 
     /**
+     * Authenticate the connection (PR #23)
+     * 
+     * WHY: Only logged-in users should be able to connect to WebSocket
+     * and collaborate on documents.
+     * 
+     * HOW: Extract JWT token from query parameter and verify it
+     */
+    try {
+      const fullUrl = `http://localhost${request.url || '/'}`
+      const parsedUrl = new URL(fullUrl)
+      const token = parsedUrl.searchParams.get('token')
+      
+      if (!token) {
+        console.log('[WebSocket] Connection rejected: no auth token provided')
+        ws.close(4401, 'Authentication required')
+        return
+      }
+
+      // Verify JWT token
+      const user = await verifyToken(token)
+      
+      // Attach user info to connection for presence
+      client.userId = user.id
+      client.userEmail = user.email || undefined
+      
+      console.log(`[WebSocket] Authenticated user: ${user.email} (${user.id})`)
+    } catch (error) {
+      console.error('[WebSocket] Authentication failed:', error)
+      ws.close(4403, 'Invalid or expired token')
+      return
+    }
+
+    /**
      * Parse room name from URL
      * 
      * WHY: y-websocket clients send the room name in the URL path.
-     * Example: ws://localhost:4000/test-document-123
+     * Example: ws://localhost:4000/test-document-123?token=...
      */
     const url = request.url || '/'
-    const roomName = url.slice(1) // Remove leading slash
+    const roomName = url.split('?')[0].slice(1) // Remove leading slash and query params
     
     if (!roomName) {
       console.log('[WebSocket] Connection rejected: no room specified')
@@ -131,7 +170,7 @@ export function createWebSocketServer(
       return
     }
 
-    console.log(`[WebSocket] Client joining room: ${roomName}`)
+    console.log(`[WebSocket] User ${client.userEmail} joining room: ${roomName}`)
 
     /**
      * Get or create the Yjs document for this room

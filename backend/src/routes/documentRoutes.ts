@@ -21,7 +21,7 @@ import {
   getDocument,
   deleteDocument,
 } from '../controllers/documentController';
-import { mockAuth } from '../middleware/auth';
+import { authenticateJWT } from '../middleware/auth';
 
 /**
  * Create Express Router
@@ -32,15 +32,17 @@ import { mockAuth } from '../middleware/auth';
 const router = express.Router();
 
 /**
- * Apply Authentication Middleware
+ * Apply Authentication Middleware (PR #23 - UPDATED!)
  * 
  * WHY: All document routes require authentication. Applying middleware
  * here means every route below will check authentication automatically.
  * 
- * HOW: mockAuth extracts user ID from x-user-id header and attaches it to req.userId.
- * In Phase 5, we'll replace mockAuth with authenticateJWT.
+ * HOW: authenticateJWT validates JWT tokens from Supabase Auth and attaches
+ * user ID to req.userId. If token is invalid/missing, request is rejected with 401.
+ * 
+ * PHASE 5: Changed from mockAuth to authenticateJWT ✅
  */
-router.use(mockAuth);
+router.use(authenticateJWT);
 
 /**
  * Document Routes

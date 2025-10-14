@@ -973,7 +973,7 @@ export default function Canvas({ provider, users, updateCursor, currentUser }: C
         width="100%"
         height="100%"
         viewBox={`${viewBoxX} ${viewBoxY} ${viewBoxWidth} ${viewBoxHeight}`}
-        preserveAspectRatio="none"
+        preserveAspectRatio="xMidYMid meet"
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}

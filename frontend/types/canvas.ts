@@ -54,6 +54,8 @@ export interface TextShape extends BaseShape {
   text: string;
   fontSize?: number;
   color?: string;
+  width: number;  // Width of the text box (for editing and resizing)
+  height: number; // Height of the text box (for editing and resizing)
 }
 
 // Union type for all shapes

@@ -372,8 +372,17 @@ export default function Canvas({ provider, users, updateCursor, currentUser }: C
           addShape({ ...baseShape, type: 'line', x2: constrainedX + 1, y2: constrainedY + 1, color: '#ef4444' })
           break
         case 'text':
-          addShape({ ...baseShape, type: 'text', text: 'Text', fontSize: 16, color: '#000000' })
-          setInteractionMode('none') // Text doesn't need drag
+          // WHY: Text boxes now work like rectangles - drag to define size
+          // Start with minimal size and user drags to expand it
+          addShape({ 
+            ...baseShape, 
+            type: 'text', 
+            text: 'Double click to edit', 
+            fontSize: 20, 
+            color: '#000000',
+            width: 1,
+            height: 1
+          })
           break
       }
       return
@@ -435,6 +444,10 @@ export default function Canvas({ provider, users, updateCursor, currentUser }: C
           updateShape(creatingId, { x: centerX, y: centerY, radius })
         } else if (shape.type === 'line') {
           updateShape(creatingId, { x2: constrainedX, y2: constrainedY })
+        } else if (shape.type === 'text') {
+          // WHY: Text boxes work like rectangles when creating
+          // User drags from start point to define the text box dimensions
+          updateShape(creatingId, { x, y, width, height })
         }
         break
         
@@ -544,6 +557,72 @@ export default function Canvas({ provider, users, updateCursor, currentUser }: C
           const constrainedRadius = Math.min(newRadius, maxRadius)
           
           updateShape(interactionStateRef.current.shapeId, { radius: constrainedRadius })
+        } else if (resizingShape.type === 'text') {
+          // Text resizing: update width and height of the text box
+          // WHY: Text boxes work like rectangles - they have x, y, width, height
+          // The text content flows within these bounds
+          
+          let newX = resizingShape.x
+          let newY = resizingShape.y
+          let newWidth = resizingShape.width
+          let newHeight = resizingShape.height
+          
+          // Update based on which handle is being dragged
+          if (handlePos.includes('l')) {
+            newX = resizingShape.x + dx
+            newWidth = resizingShape.width - dx
+          }
+          if (handlePos.includes('r')) {
+            newWidth = resizingShape.width + dx
+          }
+          if (handlePos.includes('t')) {
+            newY = resizingShape.y + dy
+            newHeight = resizingShape.height - dy
+          }
+          if (handlePos.includes('b')) {
+            newHeight = resizingShape.height + dy
+          }
+          
+          // Ensure minimum size for text box
+          if (newWidth < 50) newWidth = 50
+          if (newHeight < 30) newHeight = 30
+          
+          // Constrain to grid boundaries
+          newX = Math.max(0, Math.min(GRID_WIDTH - newWidth, newX))
+          newY = Math.max(0, Math.min(GRID_HEIGHT - newHeight, newY))
+          
+          // Adjust width/height if they would exceed grid
+          newWidth = Math.min(newWidth, GRID_WIDTH - newX)
+          newHeight = Math.min(newHeight, GRID_HEIGHT - newY)
+          
+          updateShape(interactionStateRef.current.shapeId, {
+            x: newX,
+            y: newY,
+            width: newWidth,
+            height: newHeight,
+          })
+        } else if (resizingShape.type === 'line') {
+          // Line resizing: move the start or end point
+          // WHY: Lines are defined by two points, so "resizing" means moving either endpoint
+          // This is more intuitive than trying to scale the line uniformly
+          
+          // Constrain coordinates to grid boundaries
+          const constrainedX = Math.max(0, Math.min(GRID_WIDTH, svgCoords.x))
+          const constrainedY = Math.max(0, Math.min(GRID_HEIGHT, svgCoords.y))
+          
+          if (handlePos === 'line-start') {
+            // Moving the start point (x, y)
+            updateShape(interactionStateRef.current.shapeId, {
+              x: constrainedX,
+              y: constrainedY,
+            })
+          } else if (handlePos === 'line-end') {
+            // Moving the end point (x2, y2)
+            updateShape(interactionStateRef.current.shapeId, {
+              x2: constrainedX,
+              y2: constrainedY,
+            })
+          }
         }
         break
     }
@@ -567,6 +646,77 @@ export default function Canvas({ provider, users, updateCursor, currentUser }: C
     if (interactionMode === 'creating') {
       // Select the newly created shape
       if (interactionStateRef.current.creatingShapeId) {
+        const createdShape = shapes.get(interactionStateRef.current.creatingShapeId)
+        
+        // WHY: Enforce minimum sizes for all shapes after creation
+        // If user just clicked without dragging much, apply sensible default sizes
+        // This prevents accidentally creating tiny shapes that are hard to see/select
+        
+        if (createdShape) {
+          if (createdShape.type === 'text') {
+            const minWidth = 50
+            const minHeight = 30
+            const defaultWidth = 200
+            const defaultHeight = 100
+            
+            // If the text box is too small (user barely dragged), use default size
+            if (createdShape.width < minWidth || createdShape.height < minHeight) {
+              updateShape(createdShape.id, {
+                width: Math.max(createdShape.width, defaultWidth),
+                height: Math.max(createdShape.height, defaultHeight),
+              })
+            }
+          } else if (createdShape.type === 'rect') {
+            const minWidth = 20
+            const minHeight = 20
+            const defaultWidth = 100
+            const defaultHeight = 100
+            
+            // If rectangle is too small, use default size
+            if (createdShape.width < minWidth || createdShape.height < minHeight) {
+              updateShape(createdShape.id, {
+                width: Math.max(createdShape.width, defaultWidth),
+                height: Math.max(createdShape.height, defaultHeight),
+              })
+            }
+          } else if (createdShape.type === 'circle') {
+            const minRadius = 10
+            const defaultRadius = 50
+            
+            // If circle is too small, use default radius
+            if (createdShape.radius < minRadius) {
+              updateShape(createdShape.id, {
+                radius: defaultRadius,
+              })
+            }
+          } else if (createdShape.type === 'line') {
+            const minLength = 20
+            const defaultLength = 100
+            
+            // Calculate line length using Pythagorean theorem
+            const dx = createdShape.x2 - createdShape.x
+            const dy = createdShape.y2 - createdShape.y
+            const length = Math.sqrt(dx * dx + dy * dy)
+            
+            // If line is too short, extend it to default length
+            if (length < minLength) {
+              // Calculate direction angle
+              const angle = Math.atan2(dy, dx)
+              
+              // Create a line of default length in the same direction
+              // If line was nearly a point, default to horizontal
+              const finalAngle = length < 1 ? 0 : angle
+              const newX2 = createdShape.x + Math.cos(finalAngle) * defaultLength
+              const newY2 = createdShape.y + Math.sin(finalAngle) * defaultLength
+              
+              updateShape(createdShape.id, {
+                x2: newX2,
+                y2: newY2,
+              })
+            }
+          }
+        }
+        
         selectShape(interactionStateRef.current.creatingShapeId)
       }
     }
@@ -712,11 +862,17 @@ export default function Canvas({ provider, users, updateCursor, currentUser }: C
    * 
    * WHY: Keyboard shortcuts are essential for efficient workflows.
    * Space for pan, Delete/Backspace for deleting shapes.
+   * IMPORTANT: Don't interfere with text input in textareas!
    */
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Space key for panning
-      if (e.code === 'Space' && !isSpacePressed) {
+      // Check if user is currently typing in an input or textarea
+      // WHY: We don't want canvas shortcuts to interfere with text editing
+      const target = e.target as HTMLElement
+      const isTyping = target.tagName === 'INPUT' || target.tagName === 'TEXTAREA'
+      
+      // Space key for panning (but not when typing!)
+      if (e.code === 'Space' && !isSpacePressed && !isTyping) {
         e.preventDefault()
         setIsSpacePressed(true)
         return
@@ -725,8 +881,7 @@ export default function Canvas({ provider, users, updateCursor, currentUser }: C
       // Delete or Backspace key to delete selected shapes
       if (e.key === 'Delete' || e.key === 'Backspace') {
         // Only delete if not typing in an input
-        const target = e.target as HTMLElement
-        if (target.tagName !== 'INPUT' && target.tagName !== 'TEXTAREA') {
+        if (!isTyping) {
           e.preventDefault()
           deleteSelected()
         }
@@ -734,18 +889,28 @@ export default function Canvas({ provider, users, updateCursor, currentUser }: C
     }
     
     const handleKeyUp = (e: KeyboardEvent) => {
+      // WHY: Always clear isSpacePressed when Space is released
+      // We don't check isTyping here because we need to reset the state
+      // even if focus moved to/from a text input while Space was held
       if (e.code === 'Space') {
         e.preventDefault()
         setIsSpacePressed(false)
       }
     }
     
+    // WHY: Reset isSpacePressed if window loses focus (user switches tabs/windows while holding Space)
+    const handleWindowBlur = () => {
+      setIsSpacePressed(false)
+    }
+    
     document.addEventListener('keydown', handleKeyDown)
     document.addEventListener('keyup', handleKeyUp)
+    window.addEventListener('blur', handleWindowBlur)
     
     return () => {
       document.removeEventListener('keydown', handleKeyDown)
       document.removeEventListener('keyup', handleKeyUp)
+      window.removeEventListener('blur', handleWindowBlur)
     }
   }, [isSpacePressed, deleteSelected])
   
@@ -885,7 +1050,19 @@ export default function Canvas({ provider, users, updateCursor, currentUser }: C
         shapeElement = <Line key={shape.id} shape={shape} isSelected={isSelected} onClick={handleClick} onMouseDown={handleShapeMouseDown} />
         break
       case 'text':
-        shapeElement = <Text key={shape.id} shape={shape} isSelected={isSelected} onClick={handleClick} onMouseDown={handleShapeMouseDown} />
+        shapeElement = (
+          <Text 
+            key={shape.id} 
+            shape={shape} 
+            isSelected={isSelected} 
+            onClick={handleClick} 
+            onMouseDown={handleShapeMouseDown}
+            onTextChange={(newText) => {
+              // Update the text content when user edits it
+              updateShape(shape.id, { text: newText })
+            }}
+          />
+        )
         break
       default:
         shapeElement = null
@@ -1043,7 +1220,17 @@ export default function Canvas({ provider, users, updateCursor, currentUser }: C
                 addShape({ ...baseShape, type: 'line', x2: endX, y2: endY, color: '#ef4444' })
                 break
               case 'text':
-                addShape({ ...baseShape, type: 'text', text: 'Text', fontSize: 16, color: '#000000' })
+                // WHY: Text needs width and height to define the editable box area
+                // Default to 200x100 which is a comfortable size for typing
+                addShape({ 
+                  ...baseShape, 
+                  type: 'text', 
+                  text: 'Double click to edit', 
+                  fontSize: 20, 
+                  color: '#000000',
+                  width: 200,
+                  height: 100
+                })
                 break
             }
             

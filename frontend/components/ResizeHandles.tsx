@@ -21,8 +21,8 @@ interface ResizeHandlesProps {
   onResizeStart: (position: HandlePosition, e: React.MouseEvent) => void
 }
 
-// Handle positions: corners and edges
-export type HandlePosition = 'tl' | 't' | 'tr' | 'r' | 'br' | 'b' | 'bl' | 'l'
+// Handle positions: corners and edges for rect/circle, endpoints for line
+export type HandlePosition = 'tl' | 't' | 'tr' | 'r' | 'br' | 'b' | 'bl' | 'l' | 'line-start' | 'line-end'
 
 /**
  * Get the bounding box of a shape for handle placement
@@ -49,10 +49,9 @@ function getShapeBounds(shape: Shape): { x: number; y: number; width: number; he
       const maxY = Math.max(shape.y, shape.y2)
       return { x: minX, y: minY, width: maxX - minX, height: maxY - minY }
     case 'text':
-      // For text, estimate bounds (in real app, we'd measure rendered text)
-      const fontSize = shape.fontSize || 16
-      const estimatedWidth = shape.text.length * fontSize * 0.6
-      return { x: shape.x, y: shape.y - fontSize, width: estimatedWidth, height: fontSize * 1.2 }
+      // WHY: Text shapes now have explicit width and height properties
+      // These define the editable text box area, not the text content itself
+      return { x: shape.x, y: shape.y, width: shape.width, height: shape.height }
     default:
       return { x: 0, y: 0, width: 0, height: 0 }
   }
@@ -86,17 +85,65 @@ function getHandleCoords(
       return { x, y: y + height, cursor: 'nesw-resize' }
     case 'l':
       return { x, y: centerY, cursor: 'ew-resize' }
+    default:
+      // Line handle positions are not used with this function
+      return { x, y, cursor: 'move' }
   }
 }
 
 /**
  * ResizeHandles Component
+ * 
+ * WHY: Different shapes need different resize handles.
+ * - Rectangles and circles: 8 handles (corners and edges)
+ * - Lines: 2 handles (one at each endpoint)
  */
 export default function ResizeHandles({ shape, onResizeStart }: ResizeHandlesProps) {
-  const bounds = getShapeBounds(shape)
   const handleSize = 8 // Size of handle circles in pixels
   
-  // All 8 handle positions
+  // Lines get special treatment - only 2 handles at the endpoints
+  if (shape.type === 'line') {
+    return (
+      <g data-component="resize-handles">
+        {/* Start point handle */}
+        <circle
+          cx={shape.x}
+          cy={shape.y}
+          r={handleSize / 2}
+          fill="white"
+          stroke="#0066ff"
+          strokeWidth={2}
+          style={{ cursor: 'move' }}
+          onMouseDown={(e) => {
+            e.stopPropagation() // Don't trigger shape selection
+            onResizeStart('line-start', e)
+          }}
+          data-handle-type="resize"
+          data-handle-position="line-start"
+        />
+        
+        {/* End point handle */}
+        <circle
+          cx={shape.x2}
+          cy={shape.y2}
+          r={handleSize / 2}
+          fill="white"
+          stroke="#0066ff"
+          strokeWidth={2}
+          style={{ cursor: 'move' }}
+          onMouseDown={(e) => {
+            e.stopPropagation() // Don't trigger shape selection
+            onResizeStart('line-end', e)
+          }}
+          data-handle-type="resize"
+          data-handle-position="line-end"
+        />
+      </g>
+    )
+  }
+  
+  // For rectangles, circles, and text: use the standard 8 handles
+  const bounds = getShapeBounds(shape)
   const positions: HandlePosition[] = ['tl', 't', 'tr', 'r', 'br', 'b', 'bl', 'l']
   
   return (

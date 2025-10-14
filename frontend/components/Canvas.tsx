@@ -1107,7 +1107,12 @@ export default function Canvas({ provider, users, updateCursor, currentUser }: C
       </div>
       
       {/* Multiplayer cursors overlay */}
-      <CursorOverlay users={users} currentUserId={currentUser.id} />
+      <CursorOverlay 
+        users={users} 
+        currentUserId={currentUser.id}
+        svgRef={svgRef}
+        viewport={viewport}
+      />
     </div>
   )
 }

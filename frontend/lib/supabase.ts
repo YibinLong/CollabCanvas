@@ -224,3 +224,68 @@ export async function getUserMetadata(accessToken?: string) {
   }
 }
 
+/**
+ * Helper: Clear All Shapes from a Document
+ * 
+ * WHY: Users need a way to delete all shapes at once from the canvas.
+ * This is faster and more convenient than selecting and deleting shapes individually.
+ * 
+ * WHAT IT DOES:
+ * 1. Gets the current auth token
+ * 2. Calls backend /api/documents/:id/clear endpoint
+ * 3. The backend clears the Yjs state in the database
+ * 4. Yjs automatically syncs this change to all connected users
+ * 
+ * HOW IT WORKS:
+ * - Backend sets yjsState to null in the database
+ * - Yjs WebSocket server broadcasts this to all connected clients
+ * - Each client's useYjsSync hook receives the update and clears local shapes
+ * 
+ * WHEN TO USE:
+ * - When user clicks "Clear All" button in the toolbar
+ * - To reset a canvas to a blank state
+ * 
+ * @param documentId - The document ID to clear shapes from
+ * @returns Success/error response
+ */
+export async function clearAllShapes(documentId: string) {
+  try {
+    const token = await getAuthToken()
+
+    if (!token) {
+      console.error('No auth token available')
+      return { success: false, error: 'Not authenticated' }
+    }
+
+    const response = await fetch(
+      `${process.env.NEXT_PUBLIC_API_URL}/api/documents/${documentId}/clear`,
+      {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      }
+    )
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({ error: 'Unknown error' }))
+      console.error('Failed to clear shapes:', response.status, errorData)
+      return { 
+        success: false, 
+        error: errorData.error || `Server error: ${response.status}` 
+      }
+    }
+
+    const data = await response.json()
+    console.log('✅ All shapes cleared successfully')
+    return { success: true, message: data.message }
+  } catch (error) {
+    console.error('Error clearing shapes:', error)
+    return { 
+      success: false, 
+      error: error instanceof Error ? error.message : 'Unknown error' 
+    }
+  }
+}
+

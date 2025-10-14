@@ -18,10 +18,15 @@ import UserAvatars from '@/components/UserAvatars'
 import { useAuth } from '@/lib/AuthContext'
 import { useYjsSync } from '@/lib/useYjsSync'
 import { usePresence } from '@/lib/usePresence'
+import { clearAllShapes } from '@/lib/supabase'
+import { useCanvasStore } from '@/lib/canvasStore'
 
 export default function Home() {
   const router = useRouter()
   const { user, userMetadata, loading, logout } = useAuth()
+  
+  // Get clearShapes function from Zustand store
+  const clearShapes = useCanvasStore((state) => state.clearShapes)
 
   /**
    * Real-time collaboration setup
@@ -83,6 +88,45 @@ export default function Home() {
     }
   }
 
+  /**
+   * Handle Clear All Shapes
+   * 
+   * WHY: User clicks the trash button to delete all shapes at once.
+   * 
+   * WHAT THIS DOES:
+   * 1. Calls the backend API to clear the Yjs state in the database
+   * 2. Clears the local Zustand store immediately for instant feedback
+   * 3. Yjs sync will propagate this change to all other connected users
+   * 
+   * HOW IT WORKS:
+   * - Backend clears yjsState (sets to null) in Prisma database
+   * - Yjs WebSocket detects this change and broadcasts to all clients
+   * - Each client's useYjsSync hook receives the update and clears shapes
+   * - We also clear locally for instant UI feedback
+   * 
+   * SYNC FLOW:
+   * User clicks → API call → Database updated → Yjs broadcasts → All users see empty canvas
+   */
+  const handleClearAll = async () => {
+    try {
+      // Call the API to clear shapes in the database
+      const result = await clearAllShapes(documentId)
+      
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to clear shapes')
+      }
+      
+      // Clear local shapes immediately for instant feedback
+      // Yjs will sync this to other users via the database update
+      clearShapes()
+      
+      console.log('✅ All shapes cleared successfully')
+    } catch (error) {
+      console.error('Error clearing all shapes:', error)
+      throw error // Re-throw so Toolbar can show error message
+    }
+  }
+
   // Show loading state while checking authentication
   if (loading) {
     return (
@@ -130,9 +174,9 @@ export default function Home() {
         </div>
       </div>
 
-      {/* Toolbar */}
+      {/* Toolbar with clear all functionality */}
       <div className="absolute top-16 left-0 right-0 flex justify-center z-10">
-        <Toolbar />
+        <Toolbar documentId={documentId} onClearAll={handleClearAll} />
       </div>
 
       {/* Canvas - fills the screen, pass presence props */}

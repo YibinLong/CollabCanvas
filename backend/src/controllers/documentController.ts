@@ -183,3 +183,61 @@ export async function deleteDocument(req: Request, res: Response) {
   }
 }
 
+/**
+ * Clear all shapes from a document
+ * 
+ * WHY: Users need a way to delete all shapes at once from the canvas.
+ * This is faster than deleting shapes one by one.
+ * 
+ * WHAT: This endpoint clears the Yjs state for a document, effectively
+ * removing all shapes from the canvas for all users.
+ * 
+ * HOW: 
+ * 1. Verify the user is authenticated
+ * 2. Check that the document exists
+ * 3. Set the yjsState to null (empty state)
+ * 4. Update the document's updatedAt timestamp
+ * 
+ * AUTHORIZATION: ANY authenticated user can clear shapes (no ownership check).
+ * This allows collaborative teams to clear the canvas without restrictions.
+ * 
+ * SYNC: The Yjs WebSocket server will detect this change and broadcast
+ * it to all connected users, clearing their canvas in real-time.
+ */
+export async function clearAllShapes(req: Request, res: Response) {
+  try {
+    const userId = (req as any).userId;
+    const { id } = req.params;
+
+    if (!userId) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    // Find document first (to check existence)
+    const document = await prisma.document.findUnique({
+      where: { id },
+    });
+
+    if (!document) {
+      return res.status(404).json({ error: 'Document not found' });
+    }
+
+    // NO OWNERSHIP CHECK - any authenticated user can clear shapes
+    // This allows collaborative editing without restrictions
+
+    // Clear the Yjs state (this effectively removes all shapes)
+    await prisma.document.update({
+      where: { id },
+      data: {
+        yjsState: null,
+        // updatedAt is automatically set by Prisma
+      },
+    });
+
+    res.json({ message: 'All shapes cleared successfully' });
+  } catch (error) {
+    console.error('Error clearing all shapes:', error);
+    res.status(500).json({ error: 'Failed to clear shapes' });
+  }
+}
+

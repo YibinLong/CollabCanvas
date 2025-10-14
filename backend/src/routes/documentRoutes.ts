@@ -20,6 +20,7 @@ import {
   createDocument,
   getDocument,
   deleteDocument,
+  clearAllShapes,
 } from '../controllers/documentController';
 import { authenticateJWT } from '../middleware/auth';
 
@@ -63,6 +64,11 @@ router.get('/:id', getDocument);
 
 // DELETE /api/documents/:id - Delete a document
 router.delete('/:id', deleteDocument);
+
+// POST /api/documents/:id/clear - Clear all shapes from a document
+// WHY: Allows users to delete all shapes at once from the canvas
+// This updates the database and syncs via Yjs to all connected users
+router.post('/:id/clear', clearAllShapes);
 
 /**
  * Export router as default

@@ -10,6 +10,7 @@
  * - Circle
  * - Line
  * - Text
+ * - Clear All (trash icon)
  * 
  * HOW: Connected to Zustand store so Canvas knows which tool is active.
  * When you click a tool button, it updates the global store.
@@ -19,8 +20,19 @@
 
 import { useCanvasStore } from '@/lib/canvasStore'
 import type { ShapeType } from '@/types/canvas'
+import { useState } from 'react'
 
 type Tool = 'select' | ShapeType
+
+/**
+ * Toolbar Component Props
+ * 
+ * WHY: Toolbar needs access to document ID and a callback to clear all shapes
+ */
+interface ToolbarProps {
+  documentId?: string
+  onClearAll?: () => void
+}
 
 /**
  * Toolbar Component
@@ -29,14 +41,45 @@ type Tool = 'select' | ShapeType
  * The Canvas component reads from the same store to know what to do
  * when you click on it.
  */
-export default function Toolbar() {
+export default function Toolbar({ documentId, onClearAll }: ToolbarProps) {
   // Get current tool from store AND the method to change it
   const currentTool = useCanvasStore((state) => state.currentTool)
   const setCurrentTool = useCanvasStore((state) => state.setCurrentTool)
+  const [isClearing, setIsClearing] = useState(false)
   
   const handleToolClick = (tool: Tool) => {
     // Update the global store - Canvas will react to this change
     setCurrentTool(tool)
+  }
+  
+  /**
+   * Handle Clear All Shapes
+   * 
+   * WHY: User clicks the trash button to delete all shapes at once.
+   * We need to confirm before doing this destructive action.
+   * 
+   * HOW: Show confirmation dialog, then call the parent's onClearAll callback
+   * which will handle the API call and Yjs sync.
+   */
+  const handleClearAll = async () => {
+    // Confirm before clearing (this is destructive!)
+    const confirmed = window.confirm(
+      'Are you sure you want to delete ALL shapes? This action cannot be undone and will affect all users viewing this document.'
+    )
+    
+    if (!confirmed) return
+    
+    if (onClearAll) {
+      setIsClearing(true)
+      try {
+        await onClearAll()
+      } catch (error) {
+        console.error('Error clearing shapes:', error)
+        alert('Failed to clear shapes. Please try again.')
+      } finally {
+        setIsClearing(false)
+      }
+    }
   }
   
   const buttonClass = (tool: Tool) =>
@@ -97,6 +140,43 @@ export default function Toolbar() {
       >
         <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
           <text x="10" y="15" textAnchor="middle" fontSize="16" fontWeight="bold">T</text>
+        </svg>
+      </button>
+      
+      {/* Divider before destructive action */}
+      <div className="w-px bg-gray-300" />
+      
+      {/* Clear All Shapes Button 
+          WHY: Allows users to delete all shapes at once from the canvas.
+          This is a destructive action so we:
+          1. Show it in red to indicate danger
+          2. Require confirmation before executing
+          3. Disable it while the operation is in progress
+      */}
+      <button
+        onClick={handleClearAll}
+        disabled={isClearing || !onClearAll}
+        className={`px-4 py-2 rounded transition-colors ${
+          isClearing || !onClearAll
+            ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
+            : 'bg-red-50 text-red-600 hover:bg-red-100'
+        }`}
+        title="Clear All Shapes (Delete Everything)"
+      >
+        <svg 
+          width="20" 
+          height="20" 
+          viewBox="0 0 20 20" 
+          fill="none" 
+          stroke="currentColor" 
+          strokeWidth="2"
+        >
+          {/* Trash can icon */}
+          <path d="M3 5 L17 5" />
+          <path d="M8 5 L8 3 L12 3 L12 5" />
+          <path d="M5 5 L5 17 C5 17.5 5.5 18 6 18 L14 18 C14.5 18 15 17.5 15 17 L15 5" />
+          <path d="M8 8 L8 15" />
+          <path d="M12 8 L12 15" />
         </svg>
       </button>
     </div>

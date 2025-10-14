@@ -44,13 +44,32 @@ const httpServer = http.createServer(app);
 app.use(helmet());
 
 // CORS: Allows frontend to make requests to this backend
+// WHY: Browser security requires backend to explicitly allow frontend's domain
 app.use(
   cors({
-    origin: [
-      'http://localhost:3000', // Local development frontend
-      process.env.FRONTEND_URL || '', // Production frontend URL
-    ],
+    origin: function (origin, callback) {
+      // Allow requests with no origin (like mobile apps or Postman)
+      if (!origin) return callback(null, true);
+      
+      // List of allowed origins
+      const allowedOrigins = [
+        'http://localhost:3000',  // Local development
+        'http://localhost:4000',  // Local backend (for testing)
+        process.env.FRONTEND_URL, // Main production URL
+        'https://collab-canvas-gauntlet.vercel.app', // Vercel production
+      ].filter(Boolean); // Remove undefined/empty values
+      
+      // Check if the origin is allowed
+      if (allowedOrigins.indexOf(origin) !== -1 || origin.endsWith('.vercel.app')) {
+        callback(null, true);
+      } else {
+        console.warn(`CORS: Blocked request from origin: ${origin}`);
+        callback(new Error('Not allowed by CORS'));
+      }
+    },
     credentials: true, // Allow cookies for authentication
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
   })
 );
 

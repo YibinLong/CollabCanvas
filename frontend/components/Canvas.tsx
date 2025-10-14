@@ -63,23 +63,24 @@ export default function Canvas() {
   } = useCanvasStore()
   
   /**
+   * Get authenticated user info (PR #23 - NEW!)
+   * 
+   * WHY: Use real user identity from authentication instead of mock data
+   * IMPORTANT: Must be called BEFORE useYjsSync to check if user is logged in
+   */
+  const { user } = useAuth()
+  
+  /**
    * Real-time collaboration hooks (PR #23 - UPDATED!)
    * 
    * WHY: These hooks enable multiple users to work together in real-time.
-   * - useYjsSync: Syncs shapes between all connected users
+   * - useYjsSync: Syncs shapes between all connected users (only connects if user is logged in)
    * - usePresence: Tracks cursor positions and user presence
    * 
    * PHASE 5: Now uses authenticated user identity ✅
    */
   const documentId = 'test-document-123' // TODO: Phase 4 will make this dynamic
-  const { connected, status, provider } = useYjsSync(documentId)
-  
-  /**
-   * Get authenticated user info (PR #23 - NEW!)
-   * 
-   * WHY: Use real user identity from authentication instead of mock data
-   */
-  const { user } = useAuth()
+  const { connected, status, provider } = useYjsSync(documentId, undefined, !!user)
   
   // Create currentUser object from authenticated user
   const currentUser = useMemo(() => {

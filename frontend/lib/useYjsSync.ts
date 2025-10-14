@@ -72,7 +72,10 @@ export function useYjsSync(
   const isSyncingFromYjs = useRef(false)
 
   useEffect(() => {
-    if (!enabled) return
+    if (!enabled) {
+      console.log('[Yjs] Sync disabled (user not logged in)')
+      return
+    }
 
     /**
      * STEP 0: Initialize with authentication (PR #23 - NEW!)
@@ -122,15 +125,14 @@ export function useYjsSync(
       const token = await getAuthToken()
       
       if (!token) {
-        console.error('[Yjs] No auth token available')
+        console.error('[Yjs] ❌ No auth token available')
         setStatus('error')
         setError('Authentication required')
         return null
       }
-
-      // Create WebSocket URL with token parameter
-      const urlWithAuth = `${serverUrl}/${documentId}?token=${token}`
       
+      console.log('[Yjs] 🔌 Connecting to', documentId)
+
       // Create provider with authenticated URL
       // Note: We pass the base URL to WebsocketProvider, but it constructs the full URL internally
       const provider = new WebsocketProvider(
@@ -162,9 +164,8 @@ export function useYjsSync(
      * their changes won't sync until they reconnect.
      */
     provider.on('status', (event: { status: string }) => {
-      console.log('[Yjs] Connection status:', event.status)
-      
       if (event.status === 'connected') {
+        console.log('[Yjs] ✅ Connected')
         setStatus('connected')
         setError(null)
       } else if (event.status === 'connecting') {
@@ -195,8 +196,6 @@ export function useYjsSync(
     const handleYjsUpdate = (events: Y.YEvent<any>[], transaction: Y.Transaction) => {
       // Ignore updates from our own local changes (prevents sync loops)
       if (transaction.local) return
-
-      console.log('[Yjs] Received remote update', events)
       
       // Set flag to prevent syncing back to Yjs
       isSyncingFromYjs.current = true
@@ -270,8 +269,6 @@ export function useYjsSync(
         
         if (shape) {
           // Shape exists - update or create
-          console.log('[Yjs] Syncing shape to Yjs:', shapeId)
-          
           let yjsShape = shapesMap.get(shapeId) as Y.Map<any>
           if (!yjsShape) {
             yjsShape = new Y.Map()
@@ -286,7 +283,6 @@ export function useYjsSync(
           })
         } else {
           // Shape was deleted
-          console.log('[Yjs] Deleting shape from Yjs:', shapeId)
           shapesMap.delete(shapeId)
         }
       })
@@ -324,8 +320,6 @@ export function useYjsSync(
      * server and clean up event listeners to prevent memory leaks.
      */
       return () => {
-        console.log('[Yjs] Cleaning up...')
-        
         // Clear any pending sync
         if (syncTimeout) {
           clearTimeout(syncTimeout)
@@ -340,7 +334,7 @@ export function useYjsSync(
         doc.destroy()
       }
     }).catch((error) => {
-      console.error('[Yjs] Initialization error:', error)
+      console.error('[Yjs] ❌ Initialization error:', error.message)
       setStatus('error')
       setError(error.message || 'Failed to initialize collaboration')
     })

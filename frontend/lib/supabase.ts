@@ -101,3 +101,70 @@ export async function getAuthToken() {
   return data.session.access_token;
 }
 
+/**
+ * Helper: Sign Out (Global)
+ * 
+ * WHY: Signs out the user from ALL devices and browsers.
+ * This terminates every active session for this user everywhere.
+ * 
+ * WHAT IT DOES:
+ * - Destroys all refresh tokens in the database
+ * - Clears session from localStorage
+ * - Existing access tokens remain valid until they expire (usually 1 hour)
+ * 
+ * USE CASE: When you want to kick yourself (or someone) out everywhere,
+ * like if you think your account was compromised or you shared your device.
+ */
+export async function signOutGlobal() {
+  const { error } = await supabase.auth.signOut({ scope: 'global' });
+  
+  if (error) {
+    console.error('Error signing out globally:', error);
+    return { success: false, error };
+  }
+  
+  console.log('✅ Signed out from all devices');
+  return { success: true };
+}
+
+/**
+ * Helper: Sign Out (Local Only)
+ * 
+ * WHY: Signs out only from the current browser/device.
+ * Other sessions on other devices remain active.
+ * 
+ * USE CASE: Normal logout - user just wants to log out of this browser.
+ */
+export async function signOutLocal() {
+  const { error } = await supabase.auth.signOut({ scope: 'local' });
+  
+  if (error) {
+    console.error('Error signing out locally:', error);
+    return { success: false, error };
+  }
+  
+  console.log('✅ Signed out from this device');
+  return { success: true };
+}
+
+/**
+ * Helper: Sign Out (All Other Sessions)
+ * 
+ * WHY: Signs out from all devices EXCEPT the current one.
+ * Keeps your current session active but kicks out all others.
+ * 
+ * USE CASE: If you see suspicious activity on other devices and want to
+ * kick them out but stay logged in yourself.
+ */
+export async function signOutOthers() {
+  const { error } = await supabase.auth.signOut({ scope: 'others' });
+  
+  if (error) {
+    console.error('Error signing out other sessions:', error);
+    return { success: false, error };
+  }
+  
+  console.log('✅ Signed out from all other devices');
+  return { success: true };
+}
+

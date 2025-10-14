@@ -10,7 +10,7 @@
  * WHAT: When you run 'npm run dev', this file starts the server.
  */
 
-import express from 'express';
+import express, { Request, Response, NextFunction } from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import dotenv from 'dotenv';
@@ -57,7 +57,7 @@ app.use(
 app.use(express.json());
 
 // Request logging: Log every incoming request for debugging
-app.use((req, res, next) => {
+app.use((req: Request, res: Response, next: NextFunction) => {
   console.log(`${new Date().toISOString()} - ${req.method} ${req.path}`);
   next();
 });
@@ -69,7 +69,7 @@ app.use((req, res, next) => {
  * 
  * WHAT: Returns a simple JSON response with status information.
  */
-app.get('/health', (req, res) => {
+app.get('/health', (req: Request, res: Response) => {
   res.json({
     status: 'ok',
     timestamp: new Date().toISOString(),
@@ -83,7 +83,7 @@ app.get('/health', (req, res) => {
  * 
  * WHY: Simple welcome message to confirm the API is accessible.
  */
-app.get('/', (req, res) => {
+app.get('/', (req: Request, res: Response) => {
   res.json({
     message: 'CollabCanvas API',
     version: '0.1.0',

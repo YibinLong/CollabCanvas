@@ -494,7 +494,14 @@ export default function Canvas({ provider, users, updateCursor, currentUser }: C
             height: newHeight,
           })
         } else if (resizingShape.type === 'circle') {
-          const newRadius = Math.max(5, resizingShape.radius + (dx + dy) / 2)
+          // Calculate new radius based on distance from center to current mouse position
+          // WHY: This gives consistent, predictable resizing. The circle grows/shrinks
+          // based on how far the mouse is from the center, which is intuitive.
+          const distanceFromCenter = Math.sqrt(
+            Math.pow(svgCoords.x - resizingShape.x, 2) + 
+            Math.pow(svgCoords.y - resizingShape.y, 2)
+          )
+          const newRadius = Math.max(5, distanceFromCenter)
           
           // Constrain circle radius to grid boundaries
           // WHY: Circle center is at (x, y), so radius can't make it exceed grid
@@ -769,52 +776,52 @@ export default function Canvas({ provider, users, updateCursor, currentUser }: C
         return
       }
       
-      // If not selected, just select it
+      // If not selected, select it first
       if (!isSelected) {
         selectShape(shape.id)
         return
       }
       
-      // If selected and using select tool, start moving
-      if (currentTool === 'select') {
-        const svgCoords = screenToSVG(e.clientX, e.clientY)
+      // If selected (regardless of tool), start moving
+      // WHY: Clicking and dragging an existing shape should move it, even if a creation tool is active.
+      // This is more intuitive than creating a new shape on top of an existing one.
+      const svgCoords = screenToSVG(e.clientX, e.clientY)
+      
+      // If multiple shapes are selected, prepare to move all of them together
+      if (selectedIds.length > 1) {
+        // Acquire locks for all selected shapes
+        const initialShapesMap = new Map<string, Shape>()
         
-        // If multiple shapes are selected, prepare to move all of them together
-        if (selectedIds.length > 1) {
-          // Acquire locks for all selected shapes
-          const initialShapesMap = new Map<string, Shape>()
-          
-          selectedIds.forEach(id => {
-            const selectedShape = shapes.get(id)
-            if (selectedShape && !isShapeLocked(id, currentUser.id)) {
-              lockShape(id, currentUser.id)
-              initialShapesMap.set(id, { ...selectedShape })
-            }
-          })
-          
-          setInteractionMode('moving')
-          interactionStateRef.current = {
-            startX: svgCoords.x,
-            startY: svgCoords.y,
-            lastX: svgCoords.x,
-            lastY: svgCoords.y,
-            initialShapes: initialShapesMap,
+        selectedIds.forEach(id => {
+          const selectedShape = shapes.get(id)
+          if (selectedShape && !isShapeLocked(id, currentUser.id)) {
+            lockShape(id, currentUser.id)
+            initialShapesMap.set(id, { ...selectedShape })
           }
-        } 
-        // Single shape move
-        else {
-          // Acquire lock before moving
-          lockShape(shape.id, currentUser.id)
-          
-          setInteractionMode('moving')
-          interactionStateRef.current = {
-            startX: svgCoords.x,
-            startY: svgCoords.y,
-            lastX: svgCoords.x,
-            lastY: svgCoords.y,
-            shapeId: shape.id,
-            initialShape: { ...shape },
-          }
+        })
+        
+        setInteractionMode('moving')
+        interactionStateRef.current = {
+          startX: svgCoords.x,
+          startY: svgCoords.y,
+          lastX: svgCoords.x,
+          lastY: svgCoords.y,
+          initialShapes: initialShapesMap,
+        }
+      } 
+      // Single shape move
+      else {
+        // Acquire lock before moving
+        lockShape(shape.id, currentUser.id)
+        
+        setInteractionMode('moving')
+        interactionStateRef.current = {
+          startX: svgCoords.x,
+          startY: svgCoords.y,
+          lastX: svgCoords.x,
+          lastY: svgCoords.y,
+          shapeId: shape.id,
+          initialShape: { ...shape },
         }
       }
     }

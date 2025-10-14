@@ -120,8 +120,6 @@ export function createWebSocketServer(
     const client = ws as ManagedWebSocket
     client.isAlive = true
 
-    console.log('[WebSocket] New connection from', request.socket.remoteAddress)
-
     /**
      * Authenticate the connection (PR #23)
      * 
@@ -136,7 +134,7 @@ export function createWebSocketServer(
       const token = parsedUrl.searchParams.get('token')
       
       if (!token) {
-        console.log('[WebSocket] Connection rejected: no auth token provided')
+        console.log('[WS] ❌ No token - connection rejected')
         ws.close(4401, 'Authentication required')
         return
       }
@@ -148,9 +146,9 @@ export function createWebSocketServer(
       client.userId = user.id
       client.userEmail = user.email || undefined
       
-      console.log(`[WebSocket] Authenticated user: ${user.email} (${user.id})`)
+      console.log(`[WS] ✅ ${user.email} authenticated`)
     } catch (error) {
-      console.error('[WebSocket] Authentication failed:', error)
+      console.error('[WS] ❌ Auth failed:', error instanceof Error ? error.message : 'Unknown error')
       ws.close(4403, 'Invalid or expired token')
       return
     }
@@ -165,17 +163,34 @@ export function createWebSocketServer(
     const roomName = url.split('?')[0].slice(1) // Remove leading slash and query params
     
     if (!roomName) {
-      console.log('[WebSocket] Connection rejected: no room specified')
+      console.log('[WS] ❌ No room specified')
       ws.close()
       return
     }
-
-    console.log(`[WebSocket] User ${client.userEmail} joining room: ${roomName}`)
 
     /**
      * Get or create the Yjs document for this room
      */
     const room = getOrCreateRoom(roomName)
+    
+    /**
+     * Track unique users (y-websocket creates 2 connections per user: sync + awareness)
+     * We only want to log when a NEW user joins, not for each connection
+     */
+    const isNewUser = !Array.from(room.clients).some(
+      (existingWs) => (existingWs as ManagedWebSocket).userId === client.userId
+    )
+    
+    room.clients.add(ws)
+    
+    // Count unique users (not connections)
+    const uniqueUsers = new Set(
+      Array.from(room.clients).map((ws) => (ws as ManagedWebSocket).userId)
+    )
+    
+    if (isNewUser) {
+      console.log(`[WS] 👤 ${client.userEmail} joined ${roomName} (${uniqueUsers.size} users online)`)
+    }
     
     /**
      * Use y-websocket's setupWSConnection utility
@@ -187,23 +202,28 @@ export function createWebSocketServer(
      * - Awareness (presence) updates
      */
     setupWSConnection(ws, request, { docName: roomName, gc: true })
-    
-    /**
-     * Track client in room
-     */
-    room.clients.add(ws)
-    console.log(`[WebSocket] Client joined room: ${roomName} (${room.clients.size} clients)`)
 
     /**
      * Handle disconnection
      */
     ws.on('close', () => {
-      console.log('[WebSocket] Client disconnected')
       room.clients.delete(ws)
       
+      // Check if this was the user's last connection
+      const userStillConnected = Array.from(room.clients).some(
+        (existingWs) => (existingWs as ManagedWebSocket).userId === client.userId
+      )
+      
+      const remainingUsers = new Set(
+        Array.from(room.clients).map((ws) => (ws as ManagedWebSocket).userId)
+      )
+      
+      if (!userStillConnected && client.userEmail) {
+        console.log(`[WS] 👋 ${client.userEmail} left ${roomName} (${remainingUsers.size} users online)`)
+      }
+      
       if (room.clients.size === 0) {
-        console.log(`[WebSocket] Room ${roomName} is now empty`)
-        // Could implement auto-cleanup after X minutes of inactivity
+        console.log(`[WS] 📭 Room ${roomName} is now empty`)
       }
     })
 
@@ -215,7 +235,7 @@ export function createWebSocketServer(
      * Handle errors
      */
     ws.on('error', (error) => {
-      console.error('[WebSocket] Connection error:', error)
+      console.error('[WS] ⚠️  Connection error:', error.message)
     })
   })
 
@@ -229,7 +249,7 @@ export function createWebSocketServer(
     wss.clients.forEach((ws) => {
       const client = ws as ManagedWebSocket
       if (client.isAlive === false) {
-        console.log('[WebSocket] Terminating inactive connection')
+        console.log('[WS] ⚠️  Terminating inactive connection')
         client.terminate()
         return
       }
@@ -244,7 +264,7 @@ export function createWebSocketServer(
    */
   wss.on('close', () => {
     clearInterval(keepAliveInterval)
-    console.log('[WebSocket] Server closed')
+    console.log('[WS] Server closed')
   })
 
   return wss
@@ -263,7 +283,7 @@ function getOrCreateRoom(roomName: string): Room {
   let room = rooms.get(roomName)
   
   if (!room) {
-    console.log(`[WebSocket] Creating new room: ${roomName}`)
+    console.log(`[WS] 🚪 Created room: ${roomName}`)
     
     room = {
       name: roomName,
@@ -354,7 +374,7 @@ export function closeRoom(roomName: string) {
     // Remove room
     rooms.delete(roomName)
     
-    console.log(`[WebSocket] Room ${roomName} closed`)
+    console.log(`[WS] 🚪 Room ${roomName} closed`)
   }
 }
 

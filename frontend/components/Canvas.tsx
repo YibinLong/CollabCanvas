@@ -557,10 +557,12 @@ export default function Canvas({ provider, users, updateCursor, currentUser }: C
    * ALSO: Release any locks held on shapes.
    */
   const handleMouseUp = () => {
-    // Track if we just finished any drag operation (creating, moving, or resizing)
+    // Track if we just finished any drag operation (creating, moving, resizing, OR panning)
+    // WHY: Including 'panning' prevents shape creation after panning with Space key
     const wasDragging = interactionMode === 'creating' || 
                         interactionMode === 'moving' || 
-                        interactionMode === 'resizing'
+                        interactionMode === 'resizing' ||
+                        interactionMode === 'panning'
     
     if (interactionMode === 'creating') {
       // Select the newly created shape

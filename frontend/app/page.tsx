@@ -193,7 +193,8 @@ export default function Home() {
       <div className="absolute bottom-4 left-4 bg-gray-800 border border-gray-700 rounded-lg p-3 text-xs text-gray-300 max-w-md">
         <div className="font-semibold text-white mb-2">🎮 Controls:</div>
         <div className="space-y-1">
-          <div><kbd className="bg-gray-700 px-1 rounded">Space</kbd> + Drag = Pan</div>
+          <div>Drag empty canvas = Pan</div>
+          <div><kbd className="bg-gray-700 px-1 rounded">Space</kbd> + Drag = Pan (anytime)</div>
           <div><kbd className="bg-gray-700 px-1 rounded">Scroll</kbd> = Zoom</div>
           <div><kbd className="bg-gray-700 px-1 rounded">Shift</kbd> + Click = Multi-select</div>
           <div><kbd className="bg-gray-700 px-1 rounded">Delete</kbd> = Delete selected</div>

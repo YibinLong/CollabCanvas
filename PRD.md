@@ -253,28 +253,6 @@ Production:
 
 ---
 
-## Documentation and Logs
-
-Every AI interaction should be logged in `AI_LOG.md` with this format:
-
-```
-Question: summarize user prompt
-What AI did: describe generated code or canvas changes
-Open issues/next steps: describe pending work or clarification
----
-```
-
-Example:
-
-```
-Question: create a login form
-What AI did: generated input boxes and a submit button, arranged vertically
-Open issues/next steps: add validation and accessibility labels
----
-```
-
----
-
 ## Summary
 
 * Frontend: Next.js (React + TypeScript) with SVG rendering, Zustand, TailwindCSS, and Yjs

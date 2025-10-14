@@ -16,17 +16,32 @@
 
 'use client';
 
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import { User, Session } from '@supabase/supabase-js';
-import { supabase } from './supabase';
+import { supabase, getUserMetadata } from './supabase';
 
 /**
  * Type Definitions
  * 
  * WHY: TypeScript helps catch bugs by defining expected data shapes
  */
+
+/**
+ * User Metadata Interface
+ * 
+ * WHY: We store additional user info (name, avatar) in our Prisma database,
+ * not in Supabase Auth. This interface defines that extra data.
+ */
+export interface UserMetadata {
+  id: string;
+  email: string;
+  name: string | null;
+  avatarUrl?: string | null;
+}
+
 interface AuthContextType {
-  user: User | null;              // Current user (null if logged out)
+  user: User | null;              // Current user from Supabase Auth (null if logged out)
+  userMetadata: UserMetadata | null; // User metadata from our database (includes name)
   session: Session | null;        // Current session with token
   loading: boolean;               // True while checking auth state
   signup: (email: string, password: string, name?: string) => Promise<void>;
@@ -54,8 +69,29 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
  */
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
+  const [userMetadata, setUserMetadata] = useState<UserMetadata | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
+
+  /**
+   * Helper: Fetch and set user metadata
+   * 
+   * WHY: When user logs in, we need to fetch their name and other metadata
+   * from our Prisma database (not just from Supabase Auth)
+   */
+  const fetchAndSetUserMetadata = useCallback(async (session: Session | null) => {
+    try {
+      if (session?.access_token) {
+        const metadata = await getUserMetadata(session.access_token)
+        setUserMetadata(metadata)
+      } else {
+        setUserMetadata(null)
+      }
+    } catch (error) {
+      console.error('Failed to fetch user metadata:', error)
+      setUserMetadata(null)
+    }
+  }, [])
 
   /**
    * Initialize Auth State
@@ -64,48 +100,69 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
    * (Supabase persists session to localStorage)
    */
   useEffect(() => {
-    // Check for existing session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      setLoading(false);
-    });
+    let isMounted = true
 
-    // Listen for auth state changes
+    const initializeAuth = async () => {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession()
+
+      if (!isMounted) return
+
+      setSession(session)
+      setUser(session?.user ?? null)
+      await fetchAndSetUserMetadata(session)
+      if (!isMounted) return
+      setLoading(false)
+    }
+
+    initializeAuth()
+
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      setLoading(false);
-    });
+    } = supabase.auth.onAuthStateChange(async (_event, session) => {
+      setSession(session)
+      setUser(session?.user ?? null)
+      await fetchAndSetUserMetadata(session)
+      setLoading(false)
+    })
 
-    // Cleanup: Unsubscribe when component unmounts
-    return () => subscription.unsubscribe();
-  }, []);
+    return () => {
+      isMounted = false
+      subscription.unsubscribe()
+    }
+  }, [fetchAndSetUserMetadata])
 
   /**
    * Signup Function
    * 
-   * WHY: Create new user account
+   * WHY: Create new user account with name metadata
    * 
    * HOW:
-   * 1. Call Supabase signUp API
-   * 2. If successful, call backend to create user metadata
-   * 3. User state updates automatically via onAuthStateChange
+   * 1. Call Supabase signUp API (creates user in Supabase Auth)
+   * 2. Call our backend to save user metadata (name) in Prisma database
+   * 3. Fetch and set user metadata
+   * 
+   * FLOW EXPLANATION:
+   * - Supabase Auth stores: email, password (hashed), user ID
+   * - Our Prisma DB stores: user ID, email, name, avatarUrl
+   * - We split these to keep passwords separate from our app data (more secure)
    */
   const signup = async (email: string, password: string, name?: string) => {
     try {
-      // Create user in Supabase Auth
+      // Step 1: Create user in Supabase Auth
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
-      });
+      })
 
-      if (error) throw error;
+      if (error) throw error
+      
+      if (!data.user) {
+        throw new Error('Failed to create user account')
+      }
 
-      // Call backend to create user metadata
-      // (Backend will create User record in Prisma database)
+      // Step 2: Save user metadata (name) to our Prisma database
       const response = await fetch(
         `${process.env.NEXT_PUBLIC_API_URL}/api/auth/signup`,
         {
@@ -113,19 +170,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           headers: {
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify({ email, password, name }),
+          body: JSON.stringify({ 
+            userId: data.user.id,  // Pass user ID from Supabase
+            email, 
+            name 
+          }),
         }
-      );
+      )
 
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Signup failed');
+        const errorData = await response.json()
+        throw new Error(errorData.error || 'Failed to save user metadata')
       }
+
+      // Step 3: Fetch user metadata to populate userMetadata state
+      await fetchAndSetUserMetadata(data.session ?? null)
+      
+      console.log('✅ Signup complete! User:', data.user.id, 'Name:', name)
     } catch (error: any) {
-      console.error('Signup error:', error);
-      throw error;
+      console.error('Signup error:', error)
+      throw error
     }
-  };
+  }
 
   /**
    * Login Function
@@ -142,14 +208,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
-      });
+      })
 
-      if (error) throw error;
+      if (error) throw error
+
+      await fetchAndSetUserMetadata(data.session ?? null)
     } catch (error: any) {
-      console.error('Login error:', error);
-      throw error;
+      console.error('Login error:', error)
+      throw error
     }
-  };
+  }
 
   /**
    * Logout Function
@@ -178,6 +246,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
    */
   const value = {
     user,
+    userMetadata,
     session,
     loading,
     signup,

@@ -50,7 +50,7 @@ export default function SignupPage() {
     setError('');
     
     // Validate inputs
-    if (!email || !password) {
+    if (!email || !password || !name) {
       setError('Please fill in all required fields');
       return;
     }
@@ -72,7 +72,7 @@ export default function SignupPage() {
       setLoading(true);
       
       // Call signup function from AuthContext
-      await signup(email, password, name || undefined);
+      await signup(email, password, name);
       
       // Success! Redirect to canvas
       router.push('/');
@@ -106,10 +106,10 @@ export default function SignupPage() {
 
         {/* Signup Form */}
         <form onSubmit={handleSubmit} className="space-y-4" data-testid="signup-form">
-          {/* Name Input (Optional) */}
+          {/* Name Input (Required) */}
           <div>
             <label htmlFor="name" className="block text-sm font-medium text-gray-300 mb-2">
-              Name <span className="text-gray-500">(optional)</span>
+              Name <span className="text-red-400">*</span>
             </label>
             <input
               id="name"
@@ -119,6 +119,8 @@ export default function SignupPage() {
               className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               placeholder="John Doe"
               disabled={loading}
+              required
+              data-testid="name-input"
             />
           </div>
 

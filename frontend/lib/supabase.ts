@@ -168,3 +168,59 @@ export async function signOutOthers() {
   return { success: true };
 }
 
+/**
+ * Helper: Get User Metadata from Backend
+ * 
+ * WHY: Supabase Auth only stores email and id. We store additional 
+ * metadata (name, avatarUrl) in our Prisma database. This function 
+ * fetches that data from the backend.
+ * 
+ * WHAT IT DOES:
+ * 1. Gets the current auth token
+ * 2. Calls backend /api/auth/me endpoint
+ * 3. Returns user metadata including name
+ * 
+ * WHEN TO USE: 
+ * - After login to get the user's full profile
+ * - When you need to display the user's name (instead of email)
+ * 
+ * @returns User metadata object with id, email, name, avatarUrl
+ */
+export async function getUserMetadata(accessToken?: string) {
+  try {
+    // Reuse provided token when available to avoid unnecessary refresh calls
+    let token = accessToken
+
+    if (!token) {
+      token = await getAuthToken()
+    }
+
+    if (!token) {
+      console.error('No auth token available')
+      return null
+    }
+
+    const response = await fetch(
+      `${process.env.NEXT_PUBLIC_API_URL}/api/auth/me`,
+      {
+        method: 'GET',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      }
+    )
+
+    if (!response.ok) {
+      console.error('Failed to fetch user metadata:', response.status, response.statusText)
+      return null
+    }
+
+    const data = await response.json()
+    return data.user
+  } catch (error) {
+    console.error('Error fetching user metadata:', error)
+    return null
+  }
+}
+

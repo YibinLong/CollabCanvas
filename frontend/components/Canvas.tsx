@@ -67,8 +67,10 @@ export default function Canvas() {
    * 
    * WHY: Use real user identity from authentication instead of mock data
    * IMPORTANT: Must be called BEFORE useYjsSync to check if user is logged in
+   * 
+   * UPDATED: Now also gets userMetadata which includes the user's name
    */
-  const { user } = useAuth()
+  const { user, userMetadata } = useAuth()
   
   /**
    * Real-time collaboration hooks (PR #23 - UPDATED!)
@@ -94,10 +96,10 @@ export default function Canvas() {
     
     return {
       id: user.id,
-      name: user.email || 'User',
+      name: userMetadata?.name || user.email || 'User', // Use name from metadata, fallback to email
       color: '#3b82f6', // Color will be assigned by usePresence based on user ID
     }
-  }, [user])
+  }, [user, userMetadata])
   
   const { users, updateCursor } = usePresence(provider, currentUser)
   

@@ -35,7 +35,7 @@ export interface CurrentUser {
  */
 interface UsePresenceReturn {
   users: PresenceUser[]
-  updateCursor: (x: number, y: number) => void
+  updateCursor: (x: number | null, y: number | null) => void
   setUserInfo: (user: CurrentUser) => void
 }
 

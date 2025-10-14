@@ -20,8 +20,8 @@
 
 'use client'
 
-import { useEffect, useRef, useState, useCallback, useMemo } from 'react'
-import { useCanvasStore } from '@/lib/canvasStore'
+import { useEffect, useRef, useState, useCallback } from 'react'
+import { useCanvasStore, GRID_WIDTH, GRID_HEIGHT, BASE_VIEWPORT_WIDTH, BASE_VIEWPORT_HEIGHT, DEFAULT_VIEWPORT_ZOOM } from '@/lib/canvasStore'
 import { WebsocketProvider } from 'y-websocket'
 import type { CurrentUser } from '@/lib/usePresence'
 import type { PresenceUser } from './CursorOverlay'
@@ -75,6 +75,73 @@ function calculateMoveUpdates(shape: Shape, deltaX: number, deltaY: number): Par
 }
 
 /**
+ * Constrain shape position to grid boundaries
+ * 
+ * WHY: Shapes should not be able to move outside the grid boundaries.
+ * This ensures shapes stay within the defined canvas area.
+ * 
+ * HOW: For each shape type, calculate its bounding box and constrain
+ * all points to be within [0, GRID_WIDTH] and [0, GRID_HEIGHT]
+ * 
+ * @param updates - The proposed updates to the shape
+ * @param shape - The current shape (for getting dimensions)
+ * @returns Constrained updates that keep shape within grid
+ */
+function constrainToGrid(updates: Partial<Shape>, shape: Shape): Partial<Shape> {
+  const constrained = { ...updates }
+  
+  if (shape.type === 'rect') {
+    const width = shape.width
+    const height = shape.height
+    
+    // Constrain x: left edge must be >= 0, right edge must be <= GRID_WIDTH
+    if (constrained.x !== undefined) {
+      constrained.x = Math.max(0, Math.min(GRID_WIDTH - width, constrained.x))
+    }
+    // Constrain y: top edge must be >= 0, bottom edge must be <= GRID_HEIGHT
+    if (constrained.y !== undefined) {
+      constrained.y = Math.max(0, Math.min(GRID_HEIGHT - height, constrained.y))
+    }
+  } else if (shape.type === 'circle') {
+    const radius = shape.radius
+    
+    // Constrain x: center must be >= radius and <= GRID_WIDTH - radius
+    if (constrained.x !== undefined) {
+      constrained.x = Math.max(radius, Math.min(GRID_WIDTH - radius, constrained.x))
+    }
+    // Constrain y: center must be >= radius and <= GRID_HEIGHT - radius
+    if (constrained.y !== undefined) {
+      constrained.y = Math.max(radius, Math.min(GRID_HEIGHT - radius, constrained.y))
+    }
+  } else if (shape.type === 'line') {
+    // For lines, constrain both start (x, y) and end (x2, y2) points
+    if (constrained.x !== undefined) {
+      constrained.x = Math.max(0, Math.min(GRID_WIDTH, constrained.x))
+    }
+    if (constrained.y !== undefined) {
+      constrained.y = Math.max(0, Math.min(GRID_HEIGHT, constrained.y))
+    }
+    // TypeScript needs to know these properties exist on line type
+    if ('x2' in constrained && constrained.x2 !== undefined) {
+      constrained.x2 = Math.max(0, Math.min(GRID_WIDTH, constrained.x2))
+    }
+    if ('y2' in constrained && constrained.y2 !== undefined) {
+      constrained.y2 = Math.max(0, Math.min(GRID_HEIGHT, constrained.y2))
+    }
+  } else if (shape.type === 'text') {
+    // For text, just constrain the position point
+    if (constrained.x !== undefined) {
+      constrained.x = Math.max(0, Math.min(GRID_WIDTH, constrained.x))
+    }
+    if (constrained.y !== undefined) {
+      constrained.y = Math.max(0, Math.min(GRID_HEIGHT, constrained.y))
+    }
+  }
+  
+  return constrained
+}
+
+/**
  * Canvas Component Props
  * 
  * WHY: Canvas now receives presence data from parent (page.tsx)
@@ -99,6 +166,7 @@ export default function Canvas({ provider, users, updateCursor, currentUser }: C
     currentTool,
     panViewport, 
     zoomViewport, 
+    resetViewport,
     selectShape, 
     clearSelection,
     addShape,
@@ -180,6 +248,19 @@ export default function Canvas({ provider, users, updateCursor, currentUser }: C
     
     return { x, y }
   }
+  const [clientWidth, setClientWidth] = useState<number | null>(null)
+  const [clientHeight, setClientHeight] = useState<number | null>(null)
+
+  useEffect(() => {
+    const canvasContainer = svgRef.current?.parentElement
+    if (!canvasContainer) return
+
+    const rect = canvasContainer.getBoundingClientRect()
+    setClientWidth(rect.width)
+    setClientHeight(rect.height)
+
+    resetViewport(DEFAULT_VIEWPORT_ZOOM, { width: rect.width, height: rect.height })
+  }, [resetViewport])
   
   /**
    * Handle mouse down - start interaction
@@ -226,20 +307,25 @@ export default function Canvas({ provider, users, updateCursor, currentUser }: C
     // If clicking empty canvas with a shape tool, start creating
     if (isEmptyCanvas && currentTool !== 'select') {
       const shapeId = generateId()
+      
+      // Constrain initial position to grid boundaries
+      const constrainedX = Math.max(0, Math.min(GRID_WIDTH, svgCoords.x))
+      const constrainedY = Math.max(0, Math.min(GRID_HEIGHT, svgCoords.y))
+      
       setInteractionMode('creating')
       interactionStateRef.current = {
-        startX: svgCoords.x,
-        startY: svgCoords.y,
-        lastX: svgCoords.x,
-        lastY: svgCoords.y,
+        startX: constrainedX,
+        startY: constrainedY,
+        lastX: constrainedX,
+        lastY: constrainedY,
         creatingShapeId: shapeId,
       }
       
       // Create initial shape with minimal size
       const baseShape = {
         id: shapeId,
-        x: svgCoords.x,
-        y: svgCoords.y,
+        x: constrainedX,
+        y: constrainedY,
         rotation: 0,
       }
       
@@ -253,7 +339,7 @@ export default function Canvas({ provider, users, updateCursor, currentUser }: C
           break
         case 'line':
           // Line x,y is the start point
-          addShape({ ...baseShape, type: 'line', x2: svgCoords.x + 1, y2: svgCoords.y + 1, color: '#ef4444' })
+          addShape({ ...baseShape, type: 'line', x2: constrainedX + 1, y2: constrainedY + 1, color: '#ef4444' })
           break
         case 'text':
           addShape({ ...baseShape, type: 'text', text: 'Text', fontSize: 16, color: '#000000' })
@@ -281,7 +367,10 @@ export default function Canvas({ provider, users, updateCursor, currentUser }: C
       case 'panning':
         const deltaX = e.clientX - interactionStateRef.current.lastX
         const deltaY = e.clientY - interactionStateRef.current.lastY
-        panViewport(deltaX, deltaY)
+        panViewport(deltaX, deltaY, {
+          width: clientWidth ?? BASE_VIEWPORT_WIDTH,
+          height: clientHeight ?? BASE_VIEWPORT_HEIGHT,
+        })
         interactionStateRef.current.lastX = e.clientX
         interactionStateRef.current.lastY = e.clientY
         break
@@ -296,21 +385,26 @@ export default function Canvas({ provider, users, updateCursor, currentUser }: C
         
         const startX = interactionStateRef.current.startX
         const startY = interactionStateRef.current.startY
-        const width = Math.abs(svgCoords.x - startX)
-        const height = Math.abs(svgCoords.y - startY)
-        const x = Math.min(startX, svgCoords.x)
-        const y = Math.min(startY, svgCoords.y)
+        
+        // Constrain mouse coordinates to grid boundaries while creating
+        const constrainedX = Math.max(0, Math.min(GRID_WIDTH, svgCoords.x))
+        const constrainedY = Math.max(0, Math.min(GRID_HEIGHT, svgCoords.y))
+        
+        const width = Math.abs(constrainedX - startX)
+        const height = Math.abs(constrainedY - startY)
+        const x = Math.min(startX, constrainedX)
+        const y = Math.min(startY, constrainedY)
         
         if (shape.type === 'rect') {
           updateShape(creatingId, { x, y, width, height })
         } else if (shape.type === 'circle') {
           // Circle grows from center point, so center should be midpoint between start and current
-          const centerX = (startX + svgCoords.x) / 2
-          const centerY = (startY + svgCoords.y) / 2
+          const centerX = (startX + constrainedX) / 2
+          const centerY = (startY + constrainedY) / 2
           const radius = Math.sqrt(width * width + height * height) / 2
           updateShape(creatingId, { x: centerX, y: centerY, radius })
         } else if (shape.type === 'line') {
-          updateShape(creatingId, { x2: svgCoords.x, y2: svgCoords.y })
+          updateShape(creatingId, { x2: constrainedX, y2: constrainedY })
         }
         break
         
@@ -326,9 +420,11 @@ export default function Canvas({ provider, users, updateCursor, currentUser }: C
           interactionStateRef.current.initialShapes.forEach((initialShape, shapeId) => {
             // Use helper function to calculate correct updates for each shape type
             const shapeUpdates = calculateMoveUpdates(initialShape, deltaShapeX, deltaShapeY)
+            // CONSTRAIN: Apply boundary constraints to keep shape on grid
+            const constrainedUpdates = constrainToGrid(shapeUpdates, initialShape)
             updates.push({
               id: shapeId,
-              updates: shapeUpdates
+              updates: constrainedUpdates
             })
           })
           
@@ -340,7 +436,9 @@ export default function Canvas({ provider, users, updateCursor, currentUser }: C
           if (movingShape) {
             // Use helper function to calculate correct updates for the shape type
             const shapeUpdates = calculateMoveUpdates(interactionStateRef.current.initialShape, deltaShapeX, deltaShapeY)
-            updateShape(interactionStateRef.current.shapeId, shapeUpdates)
+            // CONSTRAIN: Apply boundary constraints to keep shape on grid
+            const constrainedUpdates = constrainToGrid(shapeUpdates, interactionStateRef.current.initialShape)
+            updateShape(interactionStateRef.current.shapeId, constrainedUpdates)
           }
         }
         break
@@ -380,6 +478,15 @@ export default function Canvas({ provider, users, updateCursor, currentUser }: C
           if (newWidth < 10) newWidth = 10
           if (newHeight < 10) newHeight = 10
           
+          // Constrain to grid boundaries
+          // WHY: Prevent resizing shapes beyond grid edges
+          newX = Math.max(0, Math.min(GRID_WIDTH - newWidth, newX))
+          newY = Math.max(0, Math.min(GRID_HEIGHT - newHeight, newY))
+          
+          // Adjust width/height if they would exceed grid
+          newWidth = Math.min(newWidth, GRID_WIDTH - newX)
+          newHeight = Math.min(newHeight, GRID_HEIGHT - newY)
+          
           updateShape(interactionStateRef.current.shapeId, {
             x: newX,
             y: newY,
@@ -388,7 +495,18 @@ export default function Canvas({ provider, users, updateCursor, currentUser }: C
           })
         } else if (resizingShape.type === 'circle') {
           const newRadius = Math.max(5, resizingShape.radius + (dx + dy) / 2)
-          updateShape(interactionStateRef.current.shapeId, { radius: newRadius })
+          
+          // Constrain circle radius to grid boundaries
+          // WHY: Circle center is at (x, y), so radius can't make it exceed grid
+          const maxRadius = Math.min(
+            resizingShape.x,  // Distance to left edge
+            GRID_WIDTH - resizingShape.x,  // Distance to right edge
+            resizingShape.y,  // Distance to top edge
+            GRID_HEIGHT - resizingShape.y  // Distance to bottom edge
+          )
+          const constrainedRadius = Math.min(newRadius, maxRadius)
+          
+          updateShape(interactionStateRef.current.shapeId, { radius: constrainedRadius })
         }
         break
     }
@@ -459,7 +577,10 @@ export default function Canvas({ provider, users, updateCursor, currentUser }: C
     if (rect) {
       const mouseX = e.clientX - rect.left
       const mouseY = e.clientY - rect.top
-      zoomViewport(e.deltaY, mouseX, mouseY)
+      zoomViewport(e.deltaY, mouseX, mouseY, {
+        width: clientWidth ?? BASE_VIEWPORT_WIDTH,
+        height: clientHeight ?? BASE_VIEWPORT_HEIGHT,
+      })
     }
   }
   
@@ -790,6 +911,31 @@ export default function Canvas({ provider, users, updateCursor, currentUser }: C
     <div 
       className="w-full h-full overflow-hidden bg-gray-100"
       style={{ cursor: cursorStyle }}
+      ref={(node) => {
+        if (!node) {
+          return
+        }
+
+        const updateDimensions = () => {
+          const rect = node.getBoundingClientRect()
+          if (rect.width !== clientWidth || rect.height !== clientHeight) {
+            setClientWidth(rect.width)
+            setClientHeight(rect.height)
+          }
+        }
+
+        updateDimensions()
+
+        const resizeObserver = new ResizeObserver(() => {
+          updateDimensions()
+        })
+
+        resizeObserver.observe(node)
+
+        return () => {
+          resizeObserver.disconnect()
+        }
+      }}
     >
       <svg
         ref={svgRef}
@@ -826,24 +972,43 @@ export default function Canvas({ provider, users, updateCursor, currentUser }: C
           } else if (isEmptyCanvas && currentTool !== 'select' && interactionMode === 'none') {
             // Simple click to create shape with default size
             const svgCoords = screenToSVG(e.clientX, e.clientY)
+            
+            // Constrain click position to grid boundaries
+            const constrainedX = Math.max(0, Math.min(GRID_WIDTH, svgCoords.x))
+            const constrainedY = Math.max(0, Math.min(GRID_HEIGHT, svgCoords.y))
+            
             const shapeId = generateId()
             
             const baseShape = {
               id: shapeId,
-              x: svgCoords.x,
-              y: svgCoords.y,
+              x: constrainedX,
+              y: constrainedY,
               rotation: 0,
             }
             
             switch (currentTool) {
               case 'rect':
-                addShape({ ...baseShape, type: 'rect', width: 100, height: 100, color: '#3b82f6' })
+                // Ensure rect fits within grid bounds
+                const rectWidth = Math.min(100, GRID_WIDTH - constrainedX)
+                const rectHeight = Math.min(100, GRID_HEIGHT - constrainedY)
+                addShape({ ...baseShape, type: 'rect', width: rectWidth, height: rectHeight, color: '#3b82f6' })
                 break
               case 'circle':
-                addShape({ ...baseShape, type: 'circle', radius: 50, color: '#10b981' })
+                // Ensure circle fits within grid bounds
+                const maxRadius = Math.min(
+                  50,  // Default radius
+                  constrainedX,  // Distance to left edge
+                  GRID_WIDTH - constrainedX,  // Distance to right edge
+                  constrainedY,  // Distance to top edge
+                  GRID_HEIGHT - constrainedY  // Distance to bottom edge
+                )
+                addShape({ ...baseShape, type: 'circle', radius: maxRadius, color: '#10b981' })
                 break
               case 'line':
-                addShape({ ...baseShape, type: 'line', x2: svgCoords.x + 100, y2: svgCoords.y + 100, color: '#ef4444' })
+                // Constrain line endpoint to grid
+                const endX = Math.min(constrainedX + 100, GRID_WIDTH)
+                const endY = Math.min(constrainedY + 100, GRID_HEIGHT)
+                addShape({ ...baseShape, type: 'line', x2: endX, y2: endY, color: '#ef4444' })
                 break
               case 'text':
                 addShape({ ...baseShape, type: 'text', text: 'Text', fontSize: 16, color: '#000000' })
@@ -856,7 +1021,13 @@ export default function Canvas({ provider, users, updateCursor, currentUser }: C
         }}
         className="select-none"
       >
-        {/* Grid background */}
+        {/* Grid background 
+            WHY: Now renders a fixed-size grid instead of infinite
+            WHAT: 
+            1. White background fills the entire visible area (out-of-bounds)
+            2. Grid pattern applied only to the defined canvas area
+            3. Gray border around grid shows the boundary
+        */}
         <defs>
           <pattern
             id="grid"
@@ -872,7 +1043,44 @@ export default function Canvas({ provider, users, updateCursor, currentUser }: C
             />
           </pattern>
         </defs>
-        <rect width="100%" height="100%" fill="url(#grid)" />
+        
+        {/* White background (out-of-bounds area) */}
+        <rect 
+          x={viewBoxX - 1000} 
+          y={viewBoxY - 1000} 
+          width={viewBoxWidth + 2000} 
+          height={viewBoxHeight + 2000} 
+          fill="#f5f5f5"
+          pointerEvents="none"
+        />
+        
+        {/* Fixed-size grid area (the actual canvas) */}
+        <rect 
+          x="0" 
+          y="0" 
+          width={GRID_WIDTH} 
+          height={GRID_HEIGHT} 
+          fill="white"
+        />
+        <rect 
+          x="0" 
+          y="0" 
+          width={GRID_WIDTH} 
+          height={GRID_HEIGHT} 
+          fill="url(#grid)"
+        />
+        
+        {/* Border around grid to show boundaries */}
+        <rect 
+          x="0" 
+          y="0" 
+          width={GRID_WIDTH} 
+          height={GRID_HEIGHT} 
+          fill="none"
+          stroke="#999999"
+          strokeWidth="2"
+          pointerEvents="none"
+        />
         
         {/* Render all shapes sorted by zIndex */}
         {Array.from(shapes.values())

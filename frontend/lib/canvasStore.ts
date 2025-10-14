@@ -18,6 +18,9 @@
 import { create } from 'zustand'
 import type { Shape, ViewportState, ShapeType } from '@/types/canvas'
 
+export const BASE_VIEWPORT_WIDTH = 1920
+export const BASE_VIEWPORT_HEIGHT = 1080
+
 // Tool type includes 'select' for selection/moving
 type Tool = 'select' | ShapeType
 
@@ -41,8 +44,9 @@ interface CanvasStore {
   clearShapes: () => void
   
   setViewport: (viewport: ViewportState) => void
-  panViewport: (deltaX: number, deltaY: number) => void
-  zoomViewport: (delta: number, centerX?: number, centerY?: number) => void
+  panViewport: (deltaX: number, deltaY: number, viewportDims?: { width: number; height: number }) => void
+  zoomViewport: (delta: number, centerX?: number, centerY?: number, viewportDims?: { width: number; height: number }) => void
+  resetViewport: (zoom?: number, viewportDims?: { width: number; height: number }) => void
   
   selectShape: (id: string) => void
   deselectShape: (id: string) => void
@@ -72,14 +76,76 @@ interface CanvasStore {
  * HOW TO USE:
  * const { shapes, addShape } = useCanvasStore()
  */
+// Grid boundaries configuration
+// WHY: Define a fixed grid size so the canvas has clear boundaries
+// WHAT: The grid is 4000x3000 pixels. Users start centered at (2000, 1500)
+export const GRID_WIDTH = 4000
+export const GRID_HEIGHT = 3000
+export const VIEWPORT_PADDING = 300 // How far user can scroll past grid edges
+export const DEFAULT_VIEWPORT_ZOOM = 0.6
+
+function computeCenteredViewport(
+  zoom: number,
+  viewportDims?: { width: number; height: number }
+): ViewportState {
+  const baseWidth = viewportDims?.width ?? BASE_VIEWPORT_WIDTH
+  const baseHeight = viewportDims?.height ?? BASE_VIEWPORT_HEIGHT
+
+  const viewBoxWidth = baseWidth / zoom
+  const viewBoxHeight = baseHeight / zoom
+
+  const viewBoxX = (GRID_WIDTH / 2) - (viewBoxWidth / 2)
+  const viewBoxY = (GRID_HEIGHT / 2) - (viewBoxHeight / 2)
+
+  return {
+    x: -viewBoxX * zoom,
+    y: -viewBoxY * zoom,
+    zoom,
+  }
+}
+
+function clampViewportPosition(
+  { x, y, zoom }: ViewportState,
+  viewportDims?: { width: number; height: number }
+): Pick<ViewportState, 'x' | 'y'> {
+  const baseWidth = viewportDims?.width ?? BASE_VIEWPORT_WIDTH
+  const baseHeight = viewportDims?.height ?? BASE_VIEWPORT_HEIGHT
+
+  const viewBoxWidth = baseWidth / zoom
+  const viewBoxHeight = baseHeight / zoom
+
+  const totalWidthWithPadding = GRID_WIDTH + VIEWPORT_PADDING * 2
+  const totalHeightWithPadding = GRID_HEIGHT + VIEWPORT_PADDING * 2
+
+  let viewBoxX = -x / zoom
+  let viewBoxY = -y / zoom
+
+  if (viewBoxWidth >= totalWidthWithPadding) {
+    viewBoxX = (GRID_WIDTH / 2) - (viewBoxWidth / 2)
+  } else {
+    const minViewBoxX = -VIEWPORT_PADDING
+    const maxViewBoxX = GRID_WIDTH + VIEWPORT_PADDING - viewBoxWidth
+    viewBoxX = Math.max(minViewBoxX, Math.min(maxViewBoxX, viewBoxX))
+  }
+
+  if (viewBoxHeight >= totalHeightWithPadding) {
+    viewBoxY = (GRID_HEIGHT / 2) - (viewBoxHeight / 2)
+  } else {
+    const minViewBoxY = -VIEWPORT_PADDING
+    const maxViewBoxY = GRID_HEIGHT + VIEWPORT_PADDING - viewBoxHeight
+    viewBoxY = Math.max(minViewBoxY, Math.min(maxViewBoxY, viewBoxY))
+  }
+
+  return {
+    x: -viewBoxX * zoom,
+    y: -viewBoxY * zoom,
+  }
+}
+
 export const useCanvasStore = create<CanvasStore>((set, get) => ({
   // Initial state
   shapes: new Map(),
-  viewport: {
-    x: 0,
-    y: 0,
-    zoom: 1,
-  },
+  viewport: computeCenteredViewport(DEFAULT_VIEWPORT_ZOOM),
   selectedIds: [],
   currentTool: 'select',
   
@@ -183,15 +249,28 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
    * 
    * WHY: When user drags the canvas, we shift the viewport.
    * Delta is the change in position (not absolute position).
+   * 
+   * UPDATED: Now constrains viewport to stay within grid boundaries + padding
+   * HOW: Calculate new position, then clamp it to allowed range.
+   * Special case: When viewport is larger than grid, center the grid in viewport.
    */
-  panViewport: (deltaX: number, deltaY: number) => {
-    set((state) => ({
-      viewport: {
-        ...state.viewport,
+  panViewport: (deltaX: number, deltaY: number, viewportDims?: { width: number; height: number }) => {
+    set((state) => {
+      const proposedViewport: ViewportState = {
         x: state.viewport.x + deltaX,
         y: state.viewport.y + deltaY,
-      },
-    }))
+        zoom: state.viewport.zoom,
+      }
+
+      const clampedPosition = clampViewportPosition(proposedViewport, viewportDims)
+
+      return {
+        viewport: {
+          ...state.viewport,
+          ...clampedPosition,
+        },
+      }
+    })
   },
   
   /**
@@ -204,8 +283,11 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
    * We clamp zoom between 0.1 and 10 for reasonable limits.
    * 
    * centerX/centerY (optional) allow zooming toward mouse cursor position.
+   * 
+   * UPDATED: Now constrains viewport to grid boundaries after zooming.
+   * Special case: When viewport is larger than grid, center the grid smoothly.
    */
-  zoomViewport: (delta: number, centerX?: number, centerY?: number) => {
+  zoomViewport: (delta: number, centerX?: number, centerY?: number, viewportDims?: { width: number; height: number }) => {
     set((state) => {
       // Calculate new zoom level
       // Dividing by 1000 makes the zoom feel smooth (not too fast)
@@ -227,14 +309,27 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
         newY = centerY - (centerY - state.viewport.y) * zoomRatio
       }
       
-      return {
-        viewport: {
+      const clampedPosition = clampViewportPosition(
+        {
           x: newX,
           y: newY,
           zoom: newZoom,
         },
+        viewportDims
+      )
+
+      return {
+        viewport: {
+          x: clampedPosition.x,
+          y: clampedPosition.y,
+          zoom: newZoom,
+        },
       }
     })
+  },
+
+  resetViewport: (zoom: number = DEFAULT_VIEWPORT_ZOOM, viewportDims?: { width: number; height: number }) => {
+    set({ viewport: computeCenteredViewport(zoom, viewportDims) })
   },
   
   /**

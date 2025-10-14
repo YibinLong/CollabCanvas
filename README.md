@@ -35,8 +35,15 @@ Figma_Clone/
 ├── docs/             # All project documentation
 │   ├── architecture/     # System design docs
 │   ├── guides/           # Setup and workflow guides
+│   ├── testing/          # Testing documentation
+│   ├── deployment/       # Deployment guides
+│   ├── status-reports/   # Progress reports
 │   ├── pr-completions/   # PR completion reports
 │   └── archive/          # Historical documents
+│
+├── scripts/          # Utility scripts
+│   ├── START_TESTING.sh  # Run test suites
+│   └── DEPLOY_NOW.sh     # Deployment script
 │
 ├── PRD.md            # Product Requirements Document
 ├── TASK_LIST.md      # Development roadmap (39 PRs)
@@ -111,9 +118,18 @@ See [Frontend README](./frontend/README.md) and [Backend README](./backend/READM
 
 ## 📖 Documentation
 
+### Essential Docs
 - **[PRD.md](./PRD.md)** - Complete product requirements
 - **[TASK_LIST.md](./TASK_LIST.md)** - 39 PRs from setup to production
-- **[TDD_WORKFLOW.md](./TDD_WORKFLOW.md)** - Test-driven development approach
+- **[Documentation Index](./docs/INDEX.md)** - Complete documentation map
+
+### Quick Links
+- **[Quick Start Guide](./docs/guides/QUICK_START.md)** - Get up and running fast
+- **[Testing Guide](./docs/guides/TESTING_GUIDE.md)** - How to test the project
+- **[TDD Workflow](./docs/guides/TDD_WORKFLOW.md)** - Test-driven development approach
+- **[Deployment Guide](./docs/deployment/DEPLOYMENT_GUIDE.md)** - How to deploy
+
+### Component Docs
 - **[Frontend README](./frontend/README.md)** - Frontend details
 - **[Backend README](./backend/README.md)** - Backend details
 
@@ -133,19 +149,23 @@ See [TASK_LIST.md](./TASK_LIST.md) for the complete 39-PR roadmap.
 
 ## 📋 Current Status
 
-**✅ PR #1: Project Setup Complete**
+**✅ Phase 1-3 Complete!**
 
-- [x] Frontend Next.js project initialized
-- [x] Backend Node.js/Express project initialized
-- [x] TypeScript configured
-- [x] Folder structure created
-- [x] All dependencies listed in package.json
-- [x] README documentation written
+- ✅ **Phase 1:** Foundation & Testing Infrastructure (PR #1-3)
+- ✅ **Phase 2:** Core Canvas (PR #4-9)
+- ✅ **Phase 3:** Real-Time Collaboration (PR #10-15)
+- 🔄 **Phase 4:** Backend & Persistence (Pending)
+
+**Test Results:** 101/101 tests passing ✅
+- Backend: 32 tests
+- Frontend: 69 tests
 
 **⏭️ Next Steps:**
-- PR #2: Database schema with Prisma
-- PR #3: Testing infrastructure setup
-- PR #4-5: Basic canvas with TDD
+- PR #16-17: Document Management API
+- PR #18-19: Yjs Persistence
+- PR #20-23: Authentication
+
+See [TASK_LIST.md](./TASK_LIST.md) for complete roadmap and [Test Summary](./docs/status-reports/TEST_SUMMARY_PHASE1-3.md) for details.
 
 ## 🤝 Contributing
 
@@ -177,20 +197,23 @@ OPENAI_API_KEY=sk-your-key
 
 **⚠️ Never commit .env files to Git!**
 
-## 📚 Documentation
+## 📚 Complete Documentation Map
 
 All project documentation is organized in the [`docs/`](./docs) folder:
 
-- **[Architecture](./docs/architecture/)** - System design and structure
-- **[Guides](./docs/guides/)** - Setup instructions and workflows
-- **[PR Completions](./docs/pr-completions/)** - Completion reports for each PR
-- **[Documentation Standard](./docs/PR_DOCUMENTATION_STANDARD.md)** - How to document PRs
+### 📂 Directory Structure
+- **[docs/architecture/](./docs/architecture/)** - System design and structure
+- **[docs/guides/](./docs/guides/)** - Setup instructions and workflows
+- **[docs/testing/](./docs/testing/)** - Testing documentation
+- **[docs/deployment/](./docs/deployment/)** - Deployment guides
+- **[docs/status-reports/](./docs/status-reports/)** - Progress and completion reports
+- **[docs/pr-completions/](./docs/pr-completions/)** - Detailed PR documentation
 
-**Key Documents:**
-- [Product Requirements](./PRD.md) - Feature specifications
-- [Task List](./TASK_LIST.md) - Complete development roadmap
-- [Setup Guide](./docs/guides/SETUP_GUIDE.md) - Initial project setup
-- [TDD Workflow](./docs/guides/TDD_WORKFLOW.md) - Testing approach
+### 🔧 Scripts
+- **[scripts/START_TESTING.sh](./scripts/START_TESTING.sh)** - Run test suites
+- **[scripts/DEPLOY_NOW.sh](./scripts/DEPLOY_NOW.sh)** - Deployment automation
+
+**📋 See [Documentation Index](./docs/INDEX.md) for a complete guide to all documentation.**
 
 ## 🎯 Design Philosophy
 

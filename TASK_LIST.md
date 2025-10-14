@@ -161,96 +161,115 @@ This document outlines the complete implementation plan for the Figma clone proj
 ## Phase 3: Real-Time Collaboration (TDD)
 
 ### PR #10: Yjs Integration Tests
-**Status:** Pending
+**Status:** ✅ COMPLETE
 **TDD Step:** ✍️ WRITE TESTS FIRST
 
 **Tasks:**
-- Write test: Yjs document initializes with Y.Map
-- Write test: Shape added to Zustand syncs to Yjs
-- Write test: WebSocket connects successfully
-- Write test: Two clients sync shape creation
+- ✅ Write test: Yjs document initializes with Y.Map
+- ✅ Write test: Shape added to Zustand syncs to Yjs
+- ✅ Write test: WebSocket connects successfully
+- ✅ Write test: Two clients sync shape creation
 
 **Why:** (TDD) Write failing tests for core real-time sync functionality.
+
+**Results:** 10 tests written (8 passed initially, 2 failed as expected)
 
 ---
 
 ### PR #11: Yjs Client-Side Implementation
-**Status:** Pending
+**Status:** ✅ COMPLETE
 **TDD Step:** ✅ MAKE TESTS PASS
 
 **Tasks:**
-- Install Yjs and y-websocket on frontend
-- Create Yjs document structure for canvas state (Y.Map for shapes)
-- Implement sync between Zustand store and Yjs document (bidirectional)
-- Set up WebSocket provider to connect to backend (placeholder URL)
-- Add connection status indicator
-- Handle reconnection logic
-- **Run tests from PR #10 - all should pass**
+- ✅ Install Yjs and y-websocket on frontend (already installed)
+- ✅ Create Yjs document structure for canvas state (Y.Map for shapes)
+- ✅ Implement sync between Zustand store and Yjs document (bidirectional)
+- ✅ Set up WebSocket provider to connect to backend
+- ✅ Add connection status indicator (ConnectionStatus component)
+- ✅ Handle reconnection logic
+- ✅ **Run tests from PR #10 - all 10 tests pass!**
 
 **Why:** (TDD) Implement Yjs client integration to pass all tests from PR #10.
+
+**Files Created:**
+- `frontend/lib/useYjsSync.ts` - Hook for Yjs synchronization
+- `frontend/components/ConnectionStatus.tsx` - Connection indicator UI
 
 ---
 
 ### PR #12: WebSocket Server Tests
-**Status:** Pending
+**Status:** ✅ COMPLETE
 **TDD Step:** ✍️ WRITE TESTS FIRST
 
 **Tasks:**
-- Write test: WebSocket server starts successfully
-- Write test: Client can join a document room
-- Write test: Two clients sync updates
+- ✅ Write test: WebSocket server starts successfully
+- ✅ Write test: Client can join a document room
+- ✅ Write test: Two clients sync updates
 
 **Why:** (TDD) Write failing tests for core WebSocket functionality.
+
+**Results:** 10 tests written, all passed with basic WebSocket setup
 
 ---
 
 ### PR #13: WebSocket Server Implementation
-**Status:** Pending
+**Status:** ✅ COMPLETE
 **TDD Step:** ✅ MAKE TESTS PASS
 
 **Tasks:**
-- Set up y-websocket server on backend (separate from Express)
-- Configure WebSocket server to handle multiple document rooms
-- Implement document room management (join/leave)
-- Add connection authentication (JWT validation)
-- Enable bidirectional sync between clients
-- Monitor and log sync latency (target <100ms)
-- Add health check endpoint
-- **Run tests from PR #12 - all should pass**
+- ✅ Set up y-websocket server on backend (integrated with Express)
+- ✅ Configure WebSocket server to handle multiple document rooms
+- ✅ Implement document room management (join/leave)
+- ⏳ Add connection authentication (JWT validation) - deferred to Phase 5
+- ✅ Enable bidirectional sync between clients
+- ✅ Monitor and log sync latency (target <100ms)
+- ✅ Add health check endpoint with WebSocket stats
+- ✅ **Run tests from PR #12 - all 10 tests pass!**
 
 **Why:** (TDD) Implement WebSocket server to pass all tests from PR #12.
+
+**Files Created:**
+- `backend/src/services/websocketServer.ts` - WebSocket server implementation
+- Updated `backend/src/server.ts` - Integrated WebSocket with HTTP server
 
 ---
 
 ### PR #14: Multiplayer Presence Tests
-**Status:** Pending
+**Status:** ✅ COMPLETE
 **TDD Step:** ✍️ WRITE TESTS FIRST
 
 **Tasks:**
-- Write test: User cursor displays with name
-- Write test: Multiple users' cursors render
-- Write test: Presence list shows connected users
+- ✅ Write test: User cursor displays with name
+- ✅ Write test: Multiple users' cursors render
+- ✅ Write test: Presence list shows connected users
 
 **Why:** (TDD) Write failing tests for core presence features.
+
+**Results:** 11 tests written, all pass with component implementations
 
 ---
 
 ### PR #15: Multiplayer Presence Implementation
-**Status:** Pending
+**Status:** ✅ COMPLETE
 **TDD Step:** ✅ MAKE TESTS PASS
 
 **Tasks:**
-- Implement Yjs Awareness for user presence
-- Create CursorOverlay component to render other users' cursors
-- Assign distinct colors to each user
-- Display user names next to cursors
-- Create presence list UI showing connected users
-- Track and broadcast cursor position in real-time
-- Add user join/leave animations
-- Handle cursor rendering performance with multiple users
-- **Run tests from PR #14 - all should pass**
+- ✅ Implement Yjs Awareness for user presence
+- ✅ Create CursorOverlay component to render other users' cursors
+- ✅ Assign distinct colors to each user
+- ✅ Display user names next to cursors
+- ✅ Create presence list UI showing connected users
+- ✅ Track and broadcast cursor position in real-time
+- ✅ Add user join/leave animations
+- ✅ Handle cursor rendering performance with multiple users
+- ✅ **Run tests from PR #14 - all 11 tests pass!**
 
 **Why:** (TDD) Implement presence features to pass all tests from PR #14.
+
+**Files Created:**
+- `frontend/components/CursorOverlay.tsx` - Renders other users' cursors
+- `frontend/components/PresenceList.tsx` - Shows connected users
+- `frontend/lib/usePresence.ts` - Hook for managing awareness/presence
 
 ---
 

@@ -20,13 +20,16 @@
 
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, useCallback } from 'react'
 import { useCanvasStore } from '@/lib/canvasStore'
+import { useYjsSync } from '@/lib/useYjsSync'
+import { usePresence, throttle } from '@/lib/usePresence'
 import Rectangle from './shapes/Rectangle'
 import Circle from './shapes/Circle'
 import Line from './shapes/Line'
 import Text from './shapes/Text'
 import ResizeHandles, { type HandlePosition } from './ResizeHandles'
+import CursorOverlay from './CursorOverlay'
 import type { Shape } from '@/types/canvas'
 
 // Interaction modes
@@ -57,6 +60,54 @@ export default function Canvas() {
     toggleSelection,
     deleteSelected,
   } = useCanvasStore()
+  
+  /**
+   * Real-time collaboration hooks
+   * 
+   * WHY: These hooks enable multiple users to work together in real-time.
+   * - useYjsSync: Syncs shapes between all connected users
+   * - usePresence: Tracks cursor positions and user presence
+   */
+  const documentId = 'test-document-123' // TODO: Phase 4 will make this dynamic
+  const { connected, status, provider } = useYjsSync(documentId)
+  
+  // Mock current user (Phase 5 will get this from auth)
+  // Generate a stable user ID that persists across renders
+  const [currentUser] = useState(() => {
+    // Check localStorage for existing user ID
+    if (typeof window !== 'undefined') {
+      let userId = localStorage.getItem('collabcanvas-user-id')
+      let userName = localStorage.getItem('collabcanvas-user-name')
+      
+      if (!userId) {
+        userId = `user-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+        localStorage.setItem('collabcanvas-user-id', userId)
+      }
+      
+      if (!userName) {
+        userName = `User ${Math.floor(Math.random() * 100)}`
+        localStorage.setItem('collabcanvas-user-name', userName)
+      }
+      
+      return {
+        id: userId,
+        name: userName,
+        color: '#3b82f6',
+      }
+    }
+    
+    // Fallback for SSR
+    return {
+      id: `user-${Date.now()}`,
+      name: `User ${Math.floor(Math.random() * 100)}`,
+      color: '#3b82f6',
+    }
+  })
+  
+  const { users, updateCursor } = usePresence(provider, currentUser)
+  
+  // Track if mouse is currently over the canvas
+  const [isMouseOverCanvas, setIsMouseOverCanvas] = useState(false)
   
   // Refs for DOM and interaction state
   const svgRef = useRef<SVGSVGElement>(null)
@@ -199,6 +250,12 @@ export default function Canvas() {
    */
   const handleMouseMove = (e: React.MouseEvent<SVGSVGElement> | MouseEvent) => {
     const svgCoords = screenToSVG(e.clientX, e.clientY)
+    
+    // Track cursor position for multiplayer presence (only if mouse is over canvas)
+    // Updates every mouse move, but usePresence hook handles throttling internally
+    if (isMouseOverCanvas) {
+      updateCursor(svgCoords.x, svgCoords.y)
+    }
     
     switch (interactionMode) {
       case 'panning':
@@ -563,7 +620,16 @@ export default function Canvas() {
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
-        onMouseLeave={handleMouseUp}
+        onMouseLeave={() => {
+          handleMouseUp()
+          // Hide cursor when mouse leaves canvas
+          setIsMouseOverCanvas(false)
+          updateCursor(null, null)
+        }}
+        onMouseEnter={() => {
+          // Show cursor when mouse enters canvas
+          setIsMouseOverCanvas(true)
+        }}
         onWheel={handleWheel}
         onClick={(e) => {
           const target = e.target as HTMLElement
@@ -644,6 +710,9 @@ export default function Canvas() {
       <div className="absolute top-4 left-4 bg-white px-3 py-1 rounded shadow text-sm capitalize">
         {currentTool} Tool
       </div>
+      
+      {/* Multiplayer cursors overlay */}
+      <CursorOverlay users={users} currentUserId={currentUser.id} />
     </div>
   )
 }

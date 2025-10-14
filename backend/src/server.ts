@@ -16,6 +16,7 @@ import helmet from 'helmet';
 import dotenv from 'dotenv';
 import http from 'http';
 import { createWebSocketServer, getServerStats } from './services/websocketServer';
+import documentRoutes from './routes/documentRoutes';
 
 // Load environment variables from .env file
 dotenv.config();
@@ -94,13 +95,15 @@ app.get('/', (req, res) => {
  * API Routes
  * 
  * WHY: Organizes endpoints by feature (documents, AI, etc.)
- * WHAT: Will be added in future PRs:
- * - /api/documents - Document CRUD operations
- * - /api/ai - AI command interpretation
+ * WHAT: Each feature has its own router module:
+ * - /api/documents - Document CRUD operations (PR #17 ✅)
+ * - /api/ai - AI command interpretation (Phase 6)
  */
 
-// Placeholder for future routes
-// app.use('/api/documents', documentRoutes);
+// Document management routes (PR #17)
+app.use('/api/documents', documentRoutes);
+
+// Future routes
 // app.use('/api/ai', aiRoutes);
 
 /**

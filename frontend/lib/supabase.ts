@@ -91,7 +91,13 @@ export async function getCurrentSession() {
  * This token is sent in Authorization header: "Bearer <token>"
  */
 export async function getAuthToken() {
-  const session = await getCurrentSession();
-  return session?.access_token || null;
+  const { data, error } = await supabase.auth.refreshSession();
+
+  if (error || !data.session) {
+    console.error('Error refreshing session:', error);
+    return null;
+  }
+
+  return data.session.access_token;
 }
 

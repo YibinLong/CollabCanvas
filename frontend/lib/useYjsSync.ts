@@ -141,28 +141,10 @@ export function useYjsSync(
           // Options for the WebSocket connection
           connect: true, // Connect immediately
           // Pass token as query parameter
-          params: { token },
-          // IMPORTANT: Reduce reconnection attempts to prevent spam
-          maxBackoffTime: 5000, // Max 5 seconds between retries
-          resyncInterval: 10000, // Resync every 10 seconds if needed
+          params: { token }
         }
       )
       providerRef.current = provider
-      
-      // NEW: Handle authentication failures by destroying and recreating connection
-      provider.on('connection-close', (event: { code: number }) => {
-        console.log('[Yjs] Connection closed with code:', event.code)
-        
-        // If closed due to auth failure (code 4401 or 4403), don't auto-reconnect
-        if (event.code === 4401 || event.code === 4403) {
-          console.warn('[Yjs] Authentication failed. Token may be expired.')
-          setStatus('error')
-          setError('Authentication expired. Please refresh the page.')
-          
-          // Disconnect to stop reconnection attempts
-          provider.disconnect()
-        }
-      })
       
       return { doc, shapesMap, provider, addOrUpdateShapeFromRemote }
     }

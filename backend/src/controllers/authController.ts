@@ -17,77 +17,72 @@ import { prisma } from '../utils/prisma';
 /**
  * Signup Controller
  * 
- * WHY: Allow new users to create accounts with email/password
+ * WHY: Create user metadata in our database after Supabase Auth signup
  * 
  * WHAT: 
- * 1. Validate email and password
- * 2. Create user in Supabase Auth
- * 3. Create user record in our database (for metadata)
- * 4. Return JWT token and user info
+ * 1. Validate that user_id, email, and name are provided
+ * 2. Create user record in our Prisma database (with name)
+ * 3. Return success confirmation
  * 
- * SECURITY: Supabase handles password hashing and security automatically
+ * FLOW:
+ * - Frontend calls supabase.auth.signUp() first (creates user in Supabase Auth)
+ * - Then frontend calls this endpoint to save additional metadata (name) in Prisma
+ * 
+ * NOTE: We don't create the user in Supabase Auth here because the frontend
+ * already did that. This avoids sending passwords to our backend (more secure).
  */
 export async function signup(req: Request, res: Response) {
   try {
-    const { email, password, name } = req.body;
+    const { userId, email, name } = req.body;
 
     // Validate input
-    if (!email || !password) {
+    if (!userId || !email || !name) {
       return res.status(400).json({ 
-        error: 'Email and password are required' 
-      });
-    }
-
-    // Check password strength (minimum 6 characters)
-    if (password.length < 6) {
-      return res.status(400).json({ 
-        error: 'Password must be at least 6 characters' 
-      });
-    }
-
-    // Create user in Supabase Auth
-    const { data, error } = await supabase.auth.signUp({
-      email,
-      password,
-    });
-
-    if (error) {
-      console.error('Signup error:', error);
-      return res.status(400).json({ 
-        error: error.message || 'Failed to create account' 
-      });
-    }
-
-    if (!data.user) {
-      return res.status(400).json({ 
-        error: 'Failed to create account' 
+        error: 'User ID, email, and name are required' 
       });
     }
 
     // Create user metadata in our database
     try {
-      await prisma.user.create({
+      const user = await prisma.user.create({
         data: {
-          id: data.user.id,
-          email: data.user.email!,
-          name: name || null,
+          id: userId,
+          email: email,
+          name: name,
         },
       });
-    } catch (dbError) {
-      // User already exists in database (this is ok)
-      console.log('User already exists in database:', data.user.id);
-    }
 
-    // Return success with token and user info
-    res.status(201).json({
-      message: 'Account created successfully',
-      token: data.session?.access_token,
-      user: {
-        id: data.user.id,
-        email: data.user.email,
-        name: name || null,
-      },
-    });
+      console.log('✅ Created user metadata in database:', user.id, user.name);
+
+      // Return success with user info
+      res.status(201).json({
+        message: 'User metadata created successfully',
+        user: {
+          id: user.id,
+          email: user.email,
+          name: user.name,
+        },
+      });
+    } catch (dbError: any) {
+      // Check if user already exists
+      if (dbError.code === 'P2002') {
+        console.log('User metadata already exists:', userId);
+        // Fetch existing user and return it
+        const existingUser = await prisma.user.findUnique({
+          where: { id: userId },
+          select: { id: true, email: true, name: true },
+        });
+        
+        return res.status(200).json({
+          message: 'User metadata already exists',
+          user: existingUser,
+        });
+      }
+      
+      // Other database error
+      console.error('Database error creating user:', dbError);
+      throw dbError;
+    }
   } catch (error) {
     console.error('Signup error:', error);
     res.status(500).json({ error: 'Internal server error' });

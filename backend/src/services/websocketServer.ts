@@ -22,6 +22,7 @@ import WebSocket from 'ws'
 type ManagedWebSocket = WebSocket & { isAlive?: boolean }
 
 import * as Y from 'yjs'
+// @ts-ignore - y-websocket doesn't have type definitions
 import { setupWSConnection } from 'y-websocket/bin/utils'
 
 /**

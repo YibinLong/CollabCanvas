@@ -28,7 +28,7 @@ type ManagedWebSocket = WebSocket & {
 
 import * as Y from 'yjs'
 // @ts-ignore - y-websocket doesn't have type definitions
-import { setupWSConnection } from 'y-websocket/bin/utils'
+import { setupWSConnection, setPersistence, docs } from 'y-websocket/bin/utils'
 import { verifyToken } from '../utils/supabase'
 import { 
   loadYjsDocument, 
@@ -103,6 +103,46 @@ export function createWebSocketServer(
   // Store persistence flag globally
   persistenceEnabled = enablePersistence
   console.log(`[WebSocket] Persistence ${enablePersistence ? 'ENABLED' : 'DISABLED'}`)
+
+  /**
+   * Set up y-websocket persistence callbacks
+   * 
+   * WHY: y-websocket manages its own documents internally. We need to hook into
+   * its persistence system so it uses our database for loading/saving.
+   */
+  if (enablePersistence) {
+    setPersistence({
+      /**
+       * Load document from database when y-websocket requests it
+       */
+      bindState: async (docName: string, ydoc: Y.Doc) => {
+        console.log(`[Persistence] 📖 bindState called for ${docName}`)
+        try {
+          const loadedDoc = await loadYjsDocument(docName)
+          const state = Y.encodeStateAsUpdate(loadedDoc)
+          Y.applyUpdate(ydoc, state)
+          console.log(`[Persistence] ✅ Loaded ${docName} from database`)
+        } catch (error) {
+          console.error(`[Persistence] ⚠️ Error loading ${docName}:`, error)
+          // Continue with empty document
+        }
+      },
+      
+      /**
+       * Save document to database when y-websocket triggers write
+       */
+      writeState: async (docName: string, ydoc: Y.Doc) => {
+        console.log(`[Persistence] 💾 writeState called for ${docName}`)
+        try {
+          await saveYjsDocument(docName, ydoc)
+          console.log(`[Persistence] ✅ Saved ${docName} to database`)
+        } catch (error) {
+          console.error(`[Persistence] ❌ Error saving ${docName}:`, error)
+        }
+      }
+    })
+    console.log('[Persistence] ✅ Persistence callbacks registered with y-websocket')
+  }
 
   /**
    * Create WebSocket server attached to HTTP server
@@ -245,19 +285,16 @@ export function createWebSocketServer(
         console.log(`[WS] 📭 Room ${roomName} is now empty`)
         
         if (persistenceEnabled) {
-          try {
-            console.log(`[WS] 💾 Saving room ${roomName} to database...`)
-            await saveYjsDocument(roomName, room.doc)
-            
-            // Stop autosave for this room
-            if (room.autoSaveInterval) {
-              stopAutoSave(room.autoSaveInterval)
-              room.autoSaveInterval = undefined
+          // Get the actual Yjs document from y-websocket's docs Map
+          const ydoc = docs.get(roomName)
+          if (ydoc) {
+            try {
+              console.log(`[WS] 💾 Saving room ${roomName} to database...`)
+              await saveYjsDocument(roomName, ydoc)
+              console.log(`[WS] ✅ Room ${roomName} saved successfully`)
+            } catch (error) {
+              console.error(`[WS] ❌ Error saving room ${roomName}:`, error)
             }
-            
-            console.log(`[WS] ✅ Room ${roomName} saved successfully`)
-          } catch (error) {
-            console.error(`[WS] ❌ Error saving room ${roomName}:`, error)
           }
         }
       }
@@ -296,10 +333,38 @@ export function createWebSocketServer(
   }, pingInterval)
 
   /**
+   * Auto-save interval for persistence
+   * 
+   * WHY: Periodically save all active documents to prevent data loss.
+   * y-websocket doesn't auto-save, so we need to trigger it ourselves.
+   */
+  let autoSaveInterval: NodeJS.Timeout | undefined
+  if (enablePersistence) {
+    autoSaveInterval = setInterval(async () => {
+      console.log(`[Persistence] 🔄 Auto-save: Checking ${docs.size} active documents...`)
+      
+      // Save all active documents
+      for (const [docName, ydoc] of docs.entries()) {
+        try {
+          await saveYjsDocument(docName, ydoc)
+          console.log(`[Persistence] ✅ Auto-saved ${docName}`)
+        } catch (error) {
+          console.error(`[Persistence] ❌ Auto-save failed for ${docName}:`, error)
+        }
+      }
+    }, 10000) // Every 10 seconds
+    
+    console.log('[Persistence] ⏰ Auto-save interval started (every 10 seconds)')
+  }
+
+  /**
    * Cleanup on server close
    */
   wss.on('close', () => {
     clearInterval(keepAliveInterval)
+    if (autoSaveInterval) {
+      clearInterval(autoSaveInterval)
+    }
     console.log('[WS] Server closed')
   })
 
@@ -309,11 +374,8 @@ export function createWebSocketServer(
 /**
  * Get or create a room
  * 
- * WHY: Rooms are created on-demand when the first client joins.
- * This saves memory - we only have rooms for active documents.
- * 
- * NOW WITH PERSISTENCE: When creating a room, we load the saved state from
- * the database so users see their previous work.
+ * WHY: Rooms track connected clients for a document.
+ * The actual Yjs document is managed by y-websocket internally.
  * 
  * @param roomName - Unique room identifier (usually document ID)
  * @returns Room object
@@ -324,34 +386,13 @@ async function getOrCreateRoom(roomName: string): Promise<Room> {
   if (!room) {
     console.log(`[WS] 🚪 Creating room: ${roomName}`)
     
-    // Create the room structure
+    // Create the room structure (just for tracking clients)
+    // y-websocket manages the actual Yjs document
     room = {
       name: roomName,
-      doc: new Y.Doc(),
+      doc: new Y.Doc(), // Not used anymore, kept for interface compatibility
       clients: new Set(),
       lastUpdate: Date.now(),
-    }
-    
-    // Load persisted document state if persistence is enabled
-    if (persistenceEnabled) {
-      try {
-        console.log(`[WS] 📖 Loading document ${roomName} from database...`)
-        const loadedDoc = await loadYjsDocument(roomName)
-        
-        // Apply the loaded state to our room's document
-        const state = Y.encodeStateAsUpdate(loadedDoc)
-        Y.applyUpdate(room.doc, state)
-        
-        console.log(`[WS] ✅ Document ${roomName} loaded successfully`)
-        
-        // Start autosave (save every 10 seconds)
-        room.autoSaveInterval = startAutoSave(roomName, room.doc, 10000)
-        console.log(`[WS] ⏰ Auto-save started for ${roomName}`)
-      } catch (error) {
-        console.error(`[WS] ⚠️  Error loading document ${roomName}:`, error)
-        console.log(`[WS] 📄 Starting with empty document`)
-        // Continue with empty document - don't fail the connection
-      }
     }
     
     rooms.set(roomName, room)
@@ -427,16 +468,14 @@ export async function closeRoom(roomName: string) {
   if (room) {
     // Save to database if persistence is enabled
     if (persistenceEnabled) {
-      try {
-        console.log(`[WS] 💾 Saving room ${roomName} before closing...`)
-        await saveYjsDocument(roomName, room.doc)
-        
-        // Stop autosave
-        if (room.autoSaveInterval) {
-          stopAutoSave(room.autoSaveInterval)
+      const ydoc = docs.get(roomName)
+      if (ydoc) {
+        try {
+          console.log(`[WS] 💾 Saving room ${roomName} before closing...`)
+          await saveYjsDocument(roomName, ydoc)
+        } catch (error) {
+          console.error(`[WS] ❌ Error saving room ${roomName}:`, error)
         }
-      } catch (error) {
-        console.error(`[WS] ❌ Error saving room ${roomName}:`, error)
       }
     }
     

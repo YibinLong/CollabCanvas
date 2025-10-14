@@ -68,7 +68,7 @@ This document outlines the complete implementation plan for the Figma clone proj
 ## Phase 2: Core Canvas (TDD)
 
 ### PR #4: Canvas Tests - Basic UI & SVG Rendering
-**Status:** Pending
+**Status:** ✅ COMPLETE
 **TDD Step:** ✍️ WRITE TESTS FIRST
 
 **Tasks:**
@@ -83,7 +83,7 @@ This document outlines the complete implementation plan for the Figma clone proj
 ---
 
 ### PR #5: Canvas Implementation - Basic UI & SVG Rendering
-**Status:** Pending
+**Status:** ✅ COMPLETE
 **TDD Step:** ✅ MAKE TESTS PASS
 
 **Tasks:**
@@ -100,7 +100,7 @@ This document outlines the complete implementation plan for the Figma clone proj
 ---
 
 ### PR #6: Canvas Tests - Shape Creation & Manipulation
-**Status:** Pending
+**Status:** ✅ COMPLETE
 **TDD Step:** ✍️ WRITE TESTS FIRST
 
 **Tasks:**
@@ -114,7 +114,7 @@ This document outlines the complete implementation plan for the Figma clone proj
 ---
 
 ### PR #7: Canvas Implementation - Shape Creation & Manipulation
-**Status:** Pending
+**Status:** ✅ COMPLETE
 **TDD Step:** ✅ MAKE TESTS PASS
 
 **Tasks:**
@@ -132,7 +132,7 @@ This document outlines the complete implementation plan for the Figma clone proj
 ---
 
 ### PR #8: Canvas Tests - Advanced Selection & Layers
-**Status:** Pending
+**Status:** ✅ COMPLETE
 **TDD Step:** ✍️ WRITE TESTS FIRST
 
 **Tasks:**
@@ -145,7 +145,7 @@ This document outlines the complete implementation plan for the Figma clone proj
 ---
 
 ### PR #9: Canvas Implementation - Advanced Selection & Layers
-**Status:** Pending
+**Status:** ✅ COMPLETE
 **TDD Step:** ✅ MAKE TESTS PASS
 
 **Tasks:**

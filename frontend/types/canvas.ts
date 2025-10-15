@@ -33,9 +33,13 @@ export interface RectangleShape extends BaseShape {
 }
 
 // Circle shape
+// WHY: Circles use a bounding box (x, y, width, height) just like rectangles.
+// The actual circle is drawn inscribed within this bounding box.
+// This makes boundary checking consistent and prevents circles from going out of bounds.
 export interface CircleShape extends BaseShape {
   type: 'circle';
-  radius: number;
+  width: number;  // Width of the bounding box
+  height: number; // Height of the bounding box
   color?: string;
 }
 

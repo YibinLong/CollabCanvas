@@ -12,7 +12,7 @@ export interface CreateShapeArgs {
   y: number;
   width?: number;
   height?: number;
-  radius?: number;
+  // Note: Circles now use width/height for their bounding box, not radius
   rotation?: number;
   color?: string;
   text?: string;

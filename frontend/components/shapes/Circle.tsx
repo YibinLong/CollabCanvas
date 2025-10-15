@@ -3,13 +3,14 @@
  * 
  * WHY: We need a component to render circle shapes that appear as perfect circles.
  * 
- * WHAT: Takes CircleShape props and renders an SVG circle element.
+ * WHAT: Takes CircleShape props and renders an SVG circle element inscribed in a bounding box.
  * 
  * HOW: 
- * - Since the Canvas now uses preserveAspectRatio="xMidYMid meet", the SVG maintains
- *   its aspect ratio and shapes render with correct proportions
- * - We simply use a <circle> element with a single radius value
- * - This ensures circles always appear perfectly round on screen
+ * - Circles now use a bounding box approach (x, y, width, height) like rectangles
+ * - The circle is drawn inscribed within this bounding box
+ * - This ensures circles stay within canvas boundaries and behave consistently with other shapes
+ * - Center is calculated as (x + width/2, y + height/2)
+ * - Radius is calculated as min(width, height) / 2 to fit within the box
  */
 
 'use client'
@@ -26,48 +27,75 @@ interface CircleProps {
 /**
  * Circle Component
  * 
- * @param shape - The circle shape data (position, radius, color)
+ * @param shape - The circle shape data (position x,y and bounding box width/height)
  * @param isSelected - Whether this shape is currently selected
  * @param onClick - Handler for when user clicks this shape
  * @param onMouseDown - Handler for when user presses mouse down on this shape
  * 
- * WHY USE CIRCLE: With preserveAspectRatio="xMidYMid meet", the SVG maintains
- * proper aspect ratio, so a simple <circle> element renders as a perfect circle.
+ * WHY BOUNDING BOX: By treating circles like rectangles with a bounding box,
+ * we get consistent boundary checking and the circle can never go out of bounds.
+ * This is the same approach used by Figma, Sketch, and Adobe XD.
  */
 export default function Circle({ shape, isSelected, onClick, onMouseDown }: CircleProps) {
+  // Calculate the center of the bounding box - this is where the circle center will be
+  const centerX = shape.x + shape.width / 2
+  const centerY = shape.y + shape.height / 2
+  
+  // Calculate radius as half of the smaller dimension to inscribe circle in the box
+  // WHY: Using min(width, height) ensures the circle always fits within the bounding box
+  const radius = Math.min(shape.width, shape.height) / 2
+  
   return (
-    <circle
-      // Position (cx, cy = center coordinates)
-      // Shape.x and shape.y represent the center of the circle
-      cx={shape.x}
-      cy={shape.y}
-      r={shape.radius}
+    <>
+      {/* Show bounding box only when selected (not while creating)
+          WHY: Shows the bounding box for reference when shape is selected */}
+      {isSelected && (
+        <rect
+          x={shape.x}
+          y={shape.y}
+          width={shape.width}
+          height={shape.height}
+          fill="none"
+          stroke="#0066ff"
+          strokeWidth={1}
+          strokeDasharray="4 4"
+          pointerEvents="none"
+        />
+      )}
       
-      // Visual styling
-      fill={shape.color || '#cccccc'}
-      
-      // Apply rotation if specified (though circles look the same when rotated)
-      transform={
-        shape.rotation
-          ? `rotate(${shape.rotation} ${shape.x} ${shape.y})`
-          : undefined
-      }
-      
-      // Selection indicator
-      stroke={isSelected ? '#0066ff' : 'none'}
-      strokeWidth={isSelected ? 2 : 0}
-      
-      // Event handlers
-      onClick={onClick}
-      onMouseDown={onMouseDown}
-      
-      // Style cursor
-      style={{ cursor: 'pointer' }}
-      
-      // Data attribute for testing
-      data-shape-id={shape.id}
-      data-shape-type="circle"
-    />
+      <circle
+        // Position (cx, cy = center coordinates)
+        // Calculate center from bounding box position
+        cx={centerX}
+        cy={centerY}
+        r={radius}
+        
+        // Visual styling
+        fill={shape.color || '#cccccc'}
+        
+        // Apply rotation if specified (rotates around the center of the bounding box)
+        transform={
+          shape.rotation
+            ? `rotate(${shape.rotation} ${centerX} ${centerY})`
+            : undefined
+        }
+        
+        // Selection indicator - blue stroke around the circle itself
+        stroke={isSelected ? '#0066ff' : 'none'}
+        strokeWidth={isSelected ? 2 : 0}
+        
+        // Event handlers
+        onClick={onClick}
+        onMouseDown={onMouseDown}
+        
+        // Style cursor
+        style={{ cursor: 'pointer' }}
+        
+        // Data attribute for testing
+        data-shape-id={shape.id}
+        data-shape-type="circle"
+      />
+    </>
   )
 }
 

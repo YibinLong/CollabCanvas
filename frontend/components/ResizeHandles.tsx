@@ -28,19 +28,15 @@ export type HandlePosition = 'tl' | 't' | 'tr' | 'r' | 'br' | 'b' | 'bl' | 'l' |
  * Get the bounding box of a shape for handle placement
  * 
  * WHY: Different shape types have different ways of defining their bounds.
- * Rectangles use x, y, width, height. Circles use x, y (center) and radius.
+ * Rectangles use x, y, width, height. Circles now also use x, y, width, height for their bounding box!
  */
 function getShapeBounds(shape: Shape): { x: number; y: number; width: number; height: number } {
   switch (shape.type) {
     case 'rect':
       return { x: shape.x, y: shape.y, width: shape.width, height: shape.height }
     case 'circle':
-      return {
-        x: shape.x - shape.radius,
-        y: shape.y - shape.radius,
-        width: shape.radius * 2,
-        height: shape.radius * 2,
-      }
+      // WHY: Circles now use bounding box (x, y, width, height) just like rectangles
+      return { x: shape.x, y: shape.y, width: shape.width, height: shape.height }
     case 'line':
       // For lines, create a bounding box around the line
       const minX = Math.min(shape.x, shape.x2)

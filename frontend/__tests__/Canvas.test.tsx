@@ -192,14 +192,15 @@ describe('PR #4: Basic Shape Rendering', () => {
     
     render(<Canvas />)
     
-    // Add a circle to the store
+    // Add a circle to the store (using bounding box approach)
     act(() => {
       useCanvasStore.getState().addShape({
         id: 'circle-1',
         type: 'circle',
-        x: 200,
-        y: 200,
-        radius: 50,
+        x: 150,  // Top-left corner of bounding box (center 200 - radius 50)
+        y: 150,
+        width: 100,  // Width of bounding box (radius 50 * 2)
+        height: 100,
         color: '#00ff00',
         rotation: 0,
       })
@@ -246,9 +247,10 @@ describe('PR #4: Basic Shape Rendering', () => {
       useCanvasStore.getState().addShape({
         id: 'circle-2',
         type: 'circle',
-        x: 300,
-        y: 300,
-        radius: 75,
+        x: 225,  // Top-left corner of bounding box (center 300 - radius 75)
+        y: 225,
+        width: 150,  // Width of bounding box (radius 75 * 2)
+        height: 150,
         color: '#ffff00',
         rotation: 0,
       })
@@ -355,9 +357,10 @@ describe('PR #4: Zustand Store Integration', () => {
       store.addShape({
         id: 'test-shape-2',
         type: 'circle',
-        x: 100,
-        y: 100,
-        radius: 25,
+        x: 75,  // Top-left corner of bounding box (center 100 - radius 25)
+        y: 75,
+        width: 50,  // Width of bounding box (radius 25 * 2)
+        height: 50,
         rotation: 0,
       })
     })

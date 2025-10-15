@@ -103,15 +103,17 @@ function constrainToGrid(updates: Partial<Shape>, shape: Shape): Partial<Shape> 
       constrained.y = Math.max(0, Math.min(GRID_HEIGHT - height, constrained.y))
     }
   } else if (shape.type === 'circle') {
-    const radius = shape.radius
+    // WHY: Circles now use bounding box, so constraints work exactly like rectangles!
+    const width = shape.width
+    const height = shape.height
     
-    // Constrain x: center must be >= radius and <= GRID_WIDTH - radius
+    // Constrain x: left edge must be >= 0, right edge must be <= GRID_WIDTH
     if (constrained.x !== undefined) {
-      constrained.x = Math.max(radius, Math.min(GRID_WIDTH - radius, constrained.x))
+      constrained.x = Math.max(0, Math.min(GRID_WIDTH - width, constrained.x))
     }
-    // Constrain y: center must be >= radius and <= GRID_HEIGHT - radius
+    // Constrain y: top edge must be >= 0, bottom edge must be <= GRID_HEIGHT
     if (constrained.y !== undefined) {
-      constrained.y = Math.max(radius, Math.min(GRID_HEIGHT - radius, constrained.y))
+      constrained.y = Math.max(0, Math.min(GRID_HEIGHT - height, constrained.y))
     }
   } else if (shape.type === 'line') {
     // For lines, constrain both start (x, y) and end (x2, y2) points
@@ -370,8 +372,9 @@ export default function Canvas({ provider, users, updateCursor, currentUser }: C
           addShape({ ...baseShape, type: 'rect', width: 1, height: 1, color: '#3b82f6' })
           break
         case 'circle':
-          // Circle x,y is the CENTER, so it's correct to use svgCoords directly
-          addShape({ ...baseShape, type: 'circle', radius: 1, color: '#10b981' })
+          // WHY: Circles now use a bounding box (x, y, width, height) just like rectangles
+          // This ensures they can't go out of bounds and makes them behave consistently
+          addShape({ ...baseShape, type: 'circle', width: 1, height: 1, color: '#10b981' })
           break
         case 'line':
           // Line x,y is the start point
@@ -443,11 +446,9 @@ export default function Canvas({ provider, users, updateCursor, currentUser }: C
         if (shape.type === 'rect') {
           updateShape(creatingId, { x, y, width, height })
         } else if (shape.type === 'circle') {
-          // Circle grows from center point, so center should be midpoint between start and current
-          const centerX = (startX + constrainedX) / 2
-          const centerY = (startY + constrainedY) / 2
-          const radius = Math.sqrt(width * width + height * height) / 2
-          updateShape(creatingId, { x: centerX, y: centerY, radius })
+          // WHY: Circles now use bounding box just like rectangles!
+          // User drags from start point to create a box, and circle is inscribed within it
+          updateShape(creatingId, { x, y, width, height })
         } else if (shape.type === 'line') {
           updateShape(creatingId, { x2: constrainedX, y2: constrainedY })
         } else if (shape.type === 'text') {
@@ -543,26 +544,47 @@ export default function Canvas({ provider, users, updateCursor, currentUser }: C
             height: newHeight,
           })
         } else if (resizingShape.type === 'circle') {
-          // Calculate new radius based on distance from center to current mouse position
-          // WHY: This gives consistent, predictable resizing. The circle grows/shrinks
-          // based on how far the mouse is from the center, which is intuitive.
-          const distanceFromCenter = Math.sqrt(
-            Math.pow(svgCoords.x - resizingShape.x, 2) + 
-            Math.pow(svgCoords.y - resizingShape.y, 2)
-          )
-          const newRadius = Math.max(5, distanceFromCenter)
+          // WHY: Circles now use bounding box and resize exactly like rectangles!
+          // This gives consistent behavior across all shape types
+          let newX = resizingShape.x
+          let newY = resizingShape.y
+          let newWidth = resizingShape.width
+          let newHeight = resizingShape.height
           
-          // Constrain circle radius to grid boundaries
-          // WHY: Circle center is at (x, y), so radius can't make it exceed grid
-          const maxRadius = Math.min(
-            resizingShape.x,  // Distance to left edge
-            GRID_WIDTH - resizingShape.x,  // Distance to right edge
-            resizingShape.y,  // Distance to top edge
-            GRID_HEIGHT - resizingShape.y  // Distance to bottom edge
-          )
-          const constrainedRadius = Math.min(newRadius, maxRadius)
+          // Update based on which handle is being dragged (same logic as rectangles)
+          if (handlePos.includes('l')) {
+            newX = resizingShape.x + dx
+            newWidth = resizingShape.width - dx
+          }
+          if (handlePos.includes('r')) {
+            newWidth = resizingShape.width + dx
+          }
+          if (handlePos.includes('t')) {
+            newY = resizingShape.y + dy
+            newHeight = resizingShape.height - dy
+          }
+          if (handlePos.includes('b')) {
+            newHeight = resizingShape.height + dy
+          }
           
-          updateShape(interactionStateRef.current.shapeId, { radius: constrainedRadius })
+          // Ensure minimum size
+          if (newWidth < 10) newWidth = 10
+          if (newHeight < 10) newHeight = 10
+          
+          // Constrain to grid boundaries (same as rectangles)
+          newX = Math.max(0, Math.min(GRID_WIDTH - newWidth, newX))
+          newY = Math.max(0, Math.min(GRID_HEIGHT - newHeight, newY))
+          
+          // Adjust width/height if they would exceed grid
+          newWidth = Math.min(newWidth, GRID_WIDTH - newX)
+          newHeight = Math.min(newHeight, GRID_HEIGHT - newY)
+          
+          updateShape(interactionStateRef.current.shapeId, {
+            x: newX,
+            y: newY,
+            width: newWidth,
+            height: newHeight,
+          })
         } else if (resizingShape.type === 'text') {
           // Text resizing: update width and height of the text box
           // WHY: Text boxes work like rectangles - they have x, y, width, height
@@ -680,12 +702,16 @@ export default function Canvas({ provider, users, updateCursor, currentUser }: C
               })
             }
           } else if (createdShape.type === 'circle') {
-            const minRadius = 10
-            const defaultRadius = 50
+            // WHY: Circles now use bounding box, so enforce minimum size like rectangles
+            const minWidth = 20
+            const minHeight = 20
+            const defaultWidth = 100
+            const defaultHeight = 100
 
-            if (createdShape.radius < minRadius) {
+            if (createdShape.width < minWidth || createdShape.height < minHeight) {
               updateShape(createdShape.id, {
-                radius: defaultRadius,
+                width: Math.max(createdShape.width, defaultWidth),
+                height: Math.max(createdShape.height, defaultHeight),
               })
             }
           } else if (createdShape.type === 'line') {
@@ -864,7 +890,9 @@ export default function Canvas({ provider, users, updateCursor, currentUser }: C
           e.preventDefault()
           
           const creatingId = interactionStateRef.current.creatingShapeId
-          if (shapes.has(creatingId)) {
+          // WHY: Use useCanvasStore.getState() to get current shapes without depending on the Map in useEffect
+          // This prevents event listener thrashing when shapes change
+          if (useCanvasStore.getState().shapes.has(creatingId)) {
             removeShape(creatingId)
           }
 
@@ -920,7 +948,11 @@ export default function Canvas({ provider, users, updateCursor, currentUser }: C
       document.removeEventListener('keyup', handleKeyUp)
       window.removeEventListener('blur', handleWindowBlur)
     }
-  }, [isSpacePressed, deleteSelected, interactionMode, shapes, removeShape, clearSelection])
+    // WHY: Removed 'shapes' from dependencies to prevent event listener thrashing
+    // The shapes Map changes frequently, which was causing the event listeners to be
+    // removed and re-added constantly. This could cause the first Escape press to be lost.
+    // Now we use useCanvasStore.getState().shapes directly inside the handler instead.
+  }, [isSpacePressed, deleteSelected, interactionMode, removeShape, clearSelection])
   
   /**
    * Automatic lock timeout mechanism
@@ -939,7 +971,9 @@ export default function Canvas({ provider, users, updateCursor, currentUser }: C
     const interval = setInterval(() => {
       const now = Date.now()
       
-      shapes.forEach((shape) => {
+      // WHY: Use getState() to get current shapes without depending on the Map in useEffect
+      // This prevents the interval from being cleared and recreated every time shapes change
+      useCanvasStore.getState().shapes.forEach((shape) => {
         // Only release locks from OTHER users (not our own)
         if (shape.lockedBy && 
             shape.lockedBy !== currentUser.id && 
@@ -952,7 +986,9 @@ export default function Canvas({ provider, users, updateCursor, currentUser }: C
     }, CHECK_INTERVAL)
     
     return () => clearInterval(interval)
-  }, [shapes, currentUser.id, unlockShape])
+    // WHY: Removed 'shapes' from dependencies to prevent unnecessary interval recreation
+    // The interval now uses getState() to always get the latest shapes
+  }, [currentUser.id, unlockShape])
   
   /**
    * Render a single shape
@@ -1101,10 +1137,11 @@ export default function Canvas({ provider, users, updateCursor, currentUser }: C
               />
             )}
             {shape.type === 'circle' && (
-              <circle
-                cx={shape.x}
-                cy={shape.y}
-                r={shape.radius + 3}
+              <rect
+                x={shape.x}
+                y={shape.y}
+                width={shape.width}
+                height={shape.height}
                 fill="none"
                 stroke="#ef4444"
                 strokeWidth="2"
@@ -1113,7 +1150,7 @@ export default function Canvas({ provider, users, updateCursor, currentUser }: C
               />
             )}
             {/* Lock icon indicator */}
-            <g transform={`translate(${shape.type === 'circle' ? shape.x - shape.radius : shape.x}, ${shape.type === 'circle' ? shape.y - shape.radius - 25 : shape.y - 25})`}>
+            <g transform={`translate(${shape.x}, ${shape.y - 25})`}>
               <rect x="0" y="0" width="60" height="20" fill="rgba(239, 68, 68, 0.9)" rx="3" />
               <text x="30" y="14" fill="white" fontSize="12" textAnchor="middle" pointerEvents="none">
                 🔒 Locked
@@ -1212,15 +1249,10 @@ export default function Canvas({ provider, users, updateCursor, currentUser }: C
                 addShape({ ...baseShape, type: 'rect', width: rectWidth, height: rectHeight, color: '#3b82f6' })
                 break
               case 'circle':
-                // Ensure circle fits within grid bounds
-                const maxRadius = Math.min(
-                  50,  // Default radius
-                  constrainedX,  // Distance to left edge
-                  GRID_WIDTH - constrainedX,  // Distance to right edge
-                  constrainedY,  // Distance to top edge
-                  GRID_HEIGHT - constrainedY  // Distance to bottom edge
-                )
-                addShape({ ...baseShape, type: 'circle', radius: maxRadius, color: '#10b981' })
+                // WHY: Circles now use bounding box - ensure it fits within grid bounds
+                const circleWidth = Math.min(100, GRID_WIDTH - constrainedX)
+                const circleHeight = Math.min(100, GRID_HEIGHT - constrainedY)
+                addShape({ ...baseShape, type: 'circle', width: circleWidth, height: circleHeight, color: '#10b981' })
                 break
               case 'line':
                 // Constrain line endpoint to grid

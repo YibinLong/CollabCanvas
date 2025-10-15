@@ -198,6 +198,8 @@ export default function Home() {
           <div><kbd className="bg-gray-700 px-1 rounded">Scroll</kbd> = Zoom</div>
           <div><kbd className="bg-gray-700 px-1 rounded">Shift</kbd> + Click = Multi-select</div>
           <div><kbd className="bg-gray-700 px-1 rounded">Delete</kbd> = Delete selected</div>
+          <div><kbd className="bg-gray-700 px-1 rounded">Arrow Keys</kbd> = Move selected shape</div>
+          <div><kbd className="bg-gray-700 px-1 rounded">Shift</kbd> + <kbd className="bg-gray-700 px-1 rounded">Arrow</kbd> = Move faster (5x)</div>
         </div>
       </div>
     </main>

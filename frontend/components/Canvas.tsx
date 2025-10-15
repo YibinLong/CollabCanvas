@@ -923,6 +923,70 @@ export default function Canvas({ provider, users, updateCursor, currentUser }: C
         }
       }
       
+      // Duplicate selected shapes (Cmd+D / Ctrl+D)
+      // WHY: Duplicate is a fundamental design tool feature (Figma-like)
+      // Creates clones of selected shapes with a 20px offset for visibility
+      // NOTE: We use getState() to avoid stale closures in the event handler
+      if ((e.metaKey || e.ctrlKey) && e.key === 'd' && !isTyping) {
+        e.preventDefault()
+        
+        const currentState = useCanvasStore.getState()
+        const currentSelectedIds = currentState.selectedIds
+        const currentShapes = currentState.shapes
+        
+        if (currentSelectedIds.length > 0) {
+          const newShapeIds: string[] = []
+          
+          // Duplicate each selected shape
+          currentSelectedIds.forEach(id => {
+            const shape = currentShapes.get(id)
+            if (!shape) return
+            
+            // Generate new ID for the duplicate
+            const newId = generateId()
+            newShapeIds.push(newId)
+            
+            // Clone the shape with 20px offset
+            let duplicate: Shape
+            
+            if (shape.type === 'line') {
+              // Lines need both endpoints offset
+              duplicate = {
+                ...shape,
+                id: newId,
+                x: shape.x + 20,
+                y: shape.y + 20,
+                x2: shape.x2 + 20,
+                y2: shape.y2 + 20,
+                lockedBy: null,
+                lockedAt: null,
+              }
+            } else {
+              // Other shapes just offset x, y
+              duplicate = {
+                ...shape,
+                id: newId,
+                x: shape.x + 20,
+                y: shape.y + 20,
+                lockedBy: null,
+                lockedAt: null,
+              }
+            }
+            
+            addShape(duplicate)
+          })
+          
+          // Auto-select the duplicated shapes (Figma behavior)
+          if (newShapeIds.length > 0) {
+            if (newShapeIds.length === 1) {
+              selectShape(newShapeIds[0])
+            } else {
+              selectMultiple(newShapeIds)
+            }
+          }
+        }
+      }
+      
       // Arrow keys to move selected shapes
       // WHY: Arrow keys are essential for precise positioning in design tools (Figma-like)
       // Users can nudge shapes by 20px (normal) or 100px (with Shift) for fine control

@@ -174,6 +174,7 @@ export default function Canvas({ provider, users, updateCursor, currentUser }: C
     updateMultipleShapes,
     toggleSelection,
     deleteSelected,
+    removeShape,
     lockShape,
     unlockShape,
     isShapeLocked,
@@ -213,12 +214,14 @@ export default function Canvas({ provider, users, updateCursor, currentUser }: C
     handlePosition?: HandlePosition
     creatingShapeId?: string
     justFinishedDrag?: boolean
+    wasCancelled?: boolean
   }>({
     startX: 0,
     startY: 0,
     lastX: 0,
     lastY: 0,
     justFinishedDrag: false,
+    wasCancelled: false,
   })
   
   /**
@@ -318,6 +321,7 @@ export default function Canvas({ provider, users, updateCursor, currentUser }: C
         startY: e.clientY,
         lastX: e.clientX,
         lastY: e.clientY,
+        wasCancelled: false,
       }
       return
     }
@@ -330,6 +334,7 @@ export default function Canvas({ provider, users, updateCursor, currentUser }: C
         startY: e.clientY,
         lastX: e.clientX,
         lastY: e.clientY,
+        wasCancelled: false,
       }
       return
     }
@@ -349,6 +354,7 @@ export default function Canvas({ provider, users, updateCursor, currentUser }: C
         lastX: constrainedX,
         lastY: constrainedY,
         creatingShapeId: shapeId,
+        wasCancelled: false,
       }
       
       // Create initial shape with minimal size
@@ -636,30 +642,25 @@ export default function Canvas({ provider, users, updateCursor, currentUser }: C
    * ALSO: Release any locks held on shapes.
    */
   const handleMouseUp = () => {
-    // Track if we just finished any drag operation (creating, moving, resizing, OR panning)
-    // WHY: Including 'panning' prevents shape creation after panning with Space key
-    const wasDragging = interactionMode === 'creating' || 
-                        interactionMode === 'moving' || 
+    // WHY: Save the cancelled state BEFORE we reset it, so onClick can check it
+    const wasJustCancelled = interactionStateRef.current.wasCancelled
+    
+    const wasDragging = interactionMode === 'creating' ||
+                        interactionMode === 'moving' ||
                         interactionMode === 'resizing' ||
                         interactionMode === 'panning'
-    
+
     if (interactionMode === 'creating') {
-      // Select the newly created shape
-      if (interactionStateRef.current.creatingShapeId) {
+      if (interactionStateRef.current.creatingShapeId && !interactionStateRef.current.wasCancelled) {
         const createdShape = shapes.get(interactionStateRef.current.creatingShapeId)
-        
-        // WHY: Enforce minimum sizes for all shapes after creation
-        // If user just clicked without dragging much, apply sensible default sizes
-        // This prevents accidentally creating tiny shapes that are hard to see/select
-        
+
         if (createdShape) {
           if (createdShape.type === 'text') {
             const minWidth = 50
             const minHeight = 30
             const defaultWidth = 200
             const defaultHeight = 100
-            
-            // If the text box is too small (user barely dragged), use default size
+
             if (createdShape.width < minWidth || createdShape.height < minHeight) {
               updateShape(createdShape.id, {
                 width: Math.max(createdShape.width, defaultWidth),
@@ -671,8 +672,7 @@ export default function Canvas({ provider, users, updateCursor, currentUser }: C
             const minHeight = 20
             const defaultWidth = 100
             const defaultHeight = 100
-            
-            // If rectangle is too small, use default size
+
             if (createdShape.width < minWidth || createdShape.height < minHeight) {
               updateShape(createdShape.id, {
                 width: Math.max(createdShape.width, defaultWidth),
@@ -682,8 +682,7 @@ export default function Canvas({ provider, users, updateCursor, currentUser }: C
           } else if (createdShape.type === 'circle') {
             const minRadius = 10
             const defaultRadius = 50
-            
-            // If circle is too small, use default radius
+
             if (createdShape.radius < minRadius) {
               updateShape(createdShape.id, {
                 radius: defaultRadius,
@@ -692,23 +691,17 @@ export default function Canvas({ provider, users, updateCursor, currentUser }: C
           } else if (createdShape.type === 'line') {
             const minLength = 20
             const defaultLength = 100
-            
-            // Calculate line length using Pythagorean theorem
+
             const dx = createdShape.x2 - createdShape.x
             const dy = createdShape.y2 - createdShape.y
             const length = Math.sqrt(dx * dx + dy * dy)
-            
-            // If line is too short, extend it to default length
+
             if (length < minLength) {
-              // Calculate direction angle
               const angle = Math.atan2(dy, dx)
-              
-              // Create a line of default length in the same direction
-              // If line was nearly a point, default to horizontal
               const finalAngle = length < 1 ? 0 : angle
               const newX2 = createdShape.x + Math.cos(finalAngle) * defaultLength
               const newY2 = createdShape.y + Math.sin(finalAngle) * defaultLength
-              
+
               updateShape(createdShape.id, {
                 x2: newX2,
                 y2: newY2,
@@ -716,43 +709,27 @@ export default function Canvas({ provider, users, updateCursor, currentUser }: C
             }
           }
         }
-        
+
         selectShape(interactionStateRef.current.creatingShapeId)
       }
     }
-    
-    // Release locks if we were moving or resizing
-    if (interactionMode === 'moving') {
-      // Release locks for all shapes that were being moved
-      if (interactionStateRef.current.initialShapes) {
-        interactionStateRef.current.initialShapes.forEach((_, shapeId) => {
-          unlockShape(shapeId)
-        })
-      }
-      // Or release lock for single shape
-      else if (interactionStateRef.current.shapeId) {
-        unlockShape(interactionStateRef.current.shapeId)
-      }
-    }
-    
-    if (interactionMode === 'resizing' && interactionStateRef.current.shapeId) {
-      unlockShape(interactionStateRef.current.shapeId)
-    }
-    
+
     setInteractionMode('none')
     interactionStateRef.current = {
       startX: 0,
       startY: 0,
       lastX: 0,
       lastY: 0,
-      justFinishedDrag: wasDragging, // Flag to prevent onClick from firing after ANY drag
+      justFinishedDrag: wasDragging || wasJustCancelled, // IMPORTANT: If cancelled, treat it like a drag finished
+      wasCancelled: wasJustCancelled, // Keep the cancelled state for onClick to check
     }
-    
-    // Clear the flag after a short delay so next click works normally
-    if (wasDragging) {
+
+    // Clear both flags after a short delay so next interaction works normally
+    if (wasDragging || wasJustCancelled) {
       setTimeout(() => {
         interactionStateRef.current.justFinishedDrag = false
-      }, 10)
+        interactionStateRef.current.wasCancelled = false
+      }, 50) // Increased delay to ensure onClick has time to check the flag
     }
   }
   
@@ -861,7 +838,7 @@ export default function Canvas({ provider, users, updateCursor, currentUser }: C
    * Handle keyboard shortcuts
    * 
    * WHY: Keyboard shortcuts are essential for efficient workflows.
-   * Space for pan, Delete/Backspace for deleting shapes.
+   * Space for pan, Delete/Backspace for deleting shapes, Escape to cancel shape creation.
    * IMPORTANT: Don't interfere with text input in textareas!
    */
   useEffect(() => {
@@ -876,6 +853,37 @@ export default function Canvas({ provider, users, updateCursor, currentUser }: C
         e.preventDefault()
         setIsSpacePressed(true)
         return
+      }
+      
+      // Escape key to cancel shape creation
+      // WHY: Users should be able to cancel a shape they're currently creating if they change their mind
+      // HOW: When Escape is pressed during shape creation, we remove the in-progress shape and reset state
+      if (e.key === 'Escape') {
+        // Only cancel if we're actively creating a shape (dragging to define size)
+        if (interactionMode === 'creating' && interactionStateRef.current.creatingShapeId) {
+          e.preventDefault()
+          
+          const creatingId = interactionStateRef.current.creatingShapeId
+          if (shapes.has(creatingId)) {
+            removeShape(creatingId)
+          }
+
+          setInteractionMode('none')
+          interactionStateRef.current = {
+            startX: 0,
+            startY: 0,
+            lastX: 0,
+            lastY: 0,
+            justFinishedDrag: true,
+            creatingShapeId: undefined,
+            wasCancelled: true,
+          }
+        }
+        // If not creating but other selections exist, clear selection
+        // WHY: Escape is commonly used to deselect in design tools
+        else if (!isTyping) {
+          clearSelection()
+        }
       }
       
       // Delete or Backspace key to delete selected shapes
@@ -912,7 +920,7 @@ export default function Canvas({ provider, users, updateCursor, currentUser }: C
       document.removeEventListener('keyup', handleKeyUp)
       window.removeEventListener('blur', handleWindowBlur)
     }
-  }, [isSpacePressed, deleteSelected])
+  }, [isSpacePressed, deleteSelected, interactionMode, shapes, removeShape, clearSelection])
   
   /**
    * Automatic lock timeout mechanism
@@ -983,9 +991,8 @@ export default function Canvas({ provider, users, updateCursor, currentUser }: C
       // If not selected, select it and start moving just this shape
       if (!isSelected) {
         selectShape(shape.id)
-        // Move just this single shape (selectedIds won't update until next render)
         lockShape(shape.id, currentUser.id)
-        
+
         setInteractionMode('moving')
         interactionStateRef.current = {
           startX: svgCoords.x,
@@ -994,13 +1001,12 @@ export default function Canvas({ provider, users, updateCursor, currentUser }: C
           lastY: svgCoords.y,
           shapeId: shape.id,
           initialShape: { ...shape },
+          wasCancelled: false,
         }
       }
-      // If already selected and multiple shapes are selected, move all of them together
       else if (selectedIds.length > 1) {
-        // Acquire locks for all selected shapes
         const initialShapesMap = new Map<string, Shape>()
-        
+
         selectedIds.forEach(id => {
           const selectedShape = shapes.get(id)
           if (selectedShape && !isShapeLocked(id, currentUser.id)) {
@@ -1008,7 +1014,7 @@ export default function Canvas({ provider, users, updateCursor, currentUser }: C
             initialShapesMap.set(id, { ...selectedShape })
           }
         })
-        
+
         setInteractionMode('moving')
         interactionStateRef.current = {
           startX: svgCoords.x,
@@ -1016,13 +1022,12 @@ export default function Canvas({ provider, users, updateCursor, currentUser }: C
           lastX: svgCoords.x,
           lastY: svgCoords.y,
           initialShapes: initialShapesMap,
+          wasCancelled: false,
         }
-      } 
-      // Single shape move (already selected)
+      }
       else {
-        // Acquire lock before moving
         lockShape(shape.id, currentUser.id)
-        
+
         setInteractionMode('moving')
         interactionStateRef.current = {
           startX: svgCoords.x,
@@ -1031,6 +1036,7 @@ export default function Canvas({ provider, users, updateCursor, currentUser }: C
           lastY: svgCoords.y,
           shapeId: shape.id,
           initialShape: { ...shape },
+          wasCancelled: false,
         }
       }
     }
@@ -1166,16 +1172,19 @@ export default function Canvas({ provider, users, updateCursor, currentUser }: C
         }}
         onWheel={handleWheel}
         onClick={(e) => {
+          if (interactionStateRef.current.wasCancelled) {
+            return
+          }
+
           const target = e.target as HTMLElement
-          const isEmptyCanvas = target.tagName === 'svg' || 
+          const isEmptyCanvas = target.tagName === 'svg' ||
             target.tagName === 'SVG' ||
             (target.tagName === 'rect' && target.getAttribute('fill') === 'url(#grid)')
-          
-          // Don't create shape if we just finished dragging to create one
+
           if (interactionStateRef.current.justFinishedDrag) {
             return
           }
-          
+
           if (isEmptyCanvas && currentTool === 'select') {
             clearSelection()
           } else if (isEmptyCanvas && currentTool !== 'select' && interactionMode === 'none') {

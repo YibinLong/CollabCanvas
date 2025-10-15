@@ -371,5 +371,136 @@ describe('PR #4: Zustand Store Integration', () => {
     
     expect(useCanvasStore.getState().shapes.size).toBe(0)
   })
+
+  /**
+   * Test: Escape key cancels shape creation
+   * 
+   * WHY: Users should be able to cancel a shape they're currently creating
+   * if they change their mind while dragging to define its size.
+   * 
+   * WHAT: Start creating a shape, then press Escape before releasing the mouse.
+   * The shape should be removed from the canvas.
+   */
+  test('Escape key cancels shape creation in progress', () => {
+    // Render with mock props
+    const mockProvider = null
+    const mockUsers: any[] = []
+    const mockUpdateCursor = jest.fn()
+    const mockCurrentUser = {
+      id: 'test-user',
+      name: 'Test User',
+      color: '#ff0000',
+      cursor: null
+    }
+    
+    render(
+      <Canvas 
+        provider={mockProvider}
+        users={mockUsers}
+        updateCursor={mockUpdateCursor}
+        currentUser={mockCurrentUser}
+      />
+    )
+    
+    const store = useCanvasStore.getState()
+    
+    // Reset store to clean state
+    act(() => {
+      store.clearShapes()
+      store.clearSelection()
+      store.setCurrentTool('rect')
+    })
+    
+    const svg = document.querySelector('svg')!
+    
+    // Start creating a rectangle by mousedown on canvas
+    act(() => {
+      fireEvent.mouseDown(svg, {
+        clientX: 100,
+        clientY: 100,
+        button: 0,
+      })
+    })
+    
+    // Move mouse to define size (mousemove during creation)
+    act(() => {
+      fireEvent.mouseMove(svg, {
+        clientX: 200,
+        clientY: 200,
+      })
+    })
+    
+    // At this point, a shape should be in the store (being created)
+    expect(useCanvasStore.getState().shapes.size).toBe(1)
+    
+    // Press Escape to cancel the creation
+    act(() => {
+      fireEvent.keyDown(document, { key: 'Escape' })
+    })
+    
+    // The shape should be removed
+    expect(useCanvasStore.getState().shapes.size).toBe(0)
+  })
+
+  /**
+   * Test: Escape key clears selection when not creating
+   * 
+   * WHY: Escape is commonly used to deselect in design tools.
+   * 
+   * WHAT: Select a shape, then press Escape to clear the selection.
+   */
+  test('Escape key clears selection when not creating a shape', () => {
+    const mockProvider = null
+    const mockUsers: any[] = []
+    const mockUpdateCursor = jest.fn()
+    const mockCurrentUser = {
+      id: 'test-user',
+      name: 'Test User',
+      color: '#ff0000',
+      cursor: null
+    }
+    
+    render(
+      <Canvas 
+        provider={mockProvider}
+        users={mockUsers}
+        updateCursor={mockUpdateCursor}
+        currentUser={mockCurrentUser}
+      />
+    )
+    
+    const store = useCanvasStore.getState()
+    
+    // Reset and add a shape
+    act(() => {
+      store.clearShapes()
+      store.clearSelection()
+      store.addShape({
+        id: 'test-shape',
+        type: 'rect',
+        x: 50,
+        y: 50,
+        width: 100,
+        height: 100,
+        rotation: 0,
+        color: '#3b82f6'
+      })
+    })
+    
+    // Select the shape
+    act(() => {
+      store.selectShape('test-shape')
+    })
+    
+    expect(useCanvasStore.getState().selectedIds).toContain('test-shape')
+    
+    // Press Escape to clear selection
+    act(() => {
+      fireEvent.keyDown(document, { key: 'Escape' })
+    })
+    
+    // Selection should be cleared
+    expect(useCanvasStore.getState().selectedIds.length).toBe(0)
+  })
 })
 

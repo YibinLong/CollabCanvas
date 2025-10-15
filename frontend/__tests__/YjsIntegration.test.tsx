@@ -168,9 +168,10 @@ describe('PR #10: Yjs Integration Tests (TDD - Write Tests First)', () => {
       const testShape: Shape = {
         id: 'shape-2',
         type: 'circle',
-        x: 100,
-        y: 100,
-        radius: 40,
+        x: 60,  // Top-left corner of bounding box (center 100 - radius 40)
+        y: 60,
+        width: 80,  // Width of bounding box (radius 40 * 2)
+        height: 80,
         rotation: 0,
         color: '#ef4444',
         zIndex: 0,

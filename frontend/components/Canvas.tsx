@@ -1237,6 +1237,20 @@ export default function Canvas({ provider, users, updateCursor, currentUser }: C
     const handleShapeMouseDown = (e: React.MouseEvent) => {
       e.stopPropagation()
       
+      // If space key is pressed, prioritize panning over shape manipulation
+      // WHY: Space+Drag should ALWAYS pan, even when mouse is over a shape
+      if (isSpacePressed) {
+        setInteractionMode('panning')
+        interactionStateRef.current = {
+          startX: e.clientX,
+          startY: e.clientY,
+          lastX: e.clientX,
+          lastY: e.clientY,
+          wasCancelled: false,
+        }
+        return
+      }
+      
       // Check if shape is locked by another user
       if (isShapeLocked(shape.id, currentUser.id)) {
         // Show a visual indication (could be improved with a toast notification)

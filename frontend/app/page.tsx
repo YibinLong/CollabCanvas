@@ -10,7 +10,7 @@
 
 'use client'
 
-import { useEffect, useMemo } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Canvas from '@/components/Canvas'
 import Toolbar from '@/components/Toolbar'
@@ -27,6 +27,9 @@ export default function Home() {
   
   // Get clearShapes function from Zustand store
   const clearShapes = useCanvasStore((state) => state.clearShapes)
+  
+  // State for collapsible controls panel (starts open so new users see it)
+  const [controlsOpen, setControlsOpen] = useState(true)
 
   /**
    * Real-time collaboration setup
@@ -189,23 +192,44 @@ export default function Home() {
         />
       </div>
 
-      {/* Help Panel */}
-      <div className="absolute bottom-4 left-4 bg-gray-800 border border-gray-700 rounded-lg p-3 text-xs text-gray-300 max-w-md">
-        <div className="font-semibold text-white mb-2">🎮 Controls:</div>
-        <div className="space-y-1">
-          <div>Drag empty canvas = Pan</div>
-          <div><kbd className="bg-gray-700 px-1 rounded">Space</kbd> + Drag = Pan (anytime)</div>
-          <div><kbd className="bg-gray-700 px-1 rounded">Scroll</kbd> = Zoom</div>
-          <div><kbd className="bg-gray-700 px-1 rounded">Shift</kbd> + Click = Multi-select</div>
-          <div><kbd className="bg-gray-700 px-1 rounded">Delete</kbd> = Delete selected</div>
-          <div><kbd className="bg-gray-700 px-1 rounded">Arrow Keys</kbd> = Move selected shape</div>
-          <div><kbd className="bg-gray-700 px-1 rounded">Shift</kbd> + <kbd className="bg-gray-700 px-1 rounded">Arrow</kbd> = Move faster (5x)</div>
-          <div><kbd className="bg-gray-700 px-1 rounded">Cmd/Ctrl</kbd> + <kbd className="bg-gray-700 px-1 rounded">D</kbd> = Duplicate selected</div>
-          <div><kbd className="bg-gray-700 px-1 rounded">Cmd/Ctrl</kbd> + <kbd className="bg-gray-700 px-1 rounded">C</kbd> = Copy selected</div>
-          <div><kbd className="bg-gray-700 px-1 rounded">Cmd/Ctrl</kbd> + <kbd className="bg-gray-700 px-1 rounded">V</kbd> = Paste from clipboard</div>
-          <div>Color Picker = Select shape(s) to see properties panel</div>
-          <div>Alignment Tools = Select 2+ shapes to see alignment toolbar</div>
-        </div>
+      {/* Collapsible Help Panel */}
+      <div className="absolute bottom-4 left-4">
+        {controlsOpen ? (
+          // Expanded panel - shows all controls
+          <div 
+            className="bg-gray-800 border border-gray-700 rounded-lg p-3 text-xs text-gray-300 max-w-md cursor-pointer hover:border-gray-600 transition-colors"
+            onClick={() => setControlsOpen(false)}
+          >
+            <div className="font-semibold text-white mb-2 flex items-center justify-between">
+              <span>🎮 Controls</span>
+              <span className="text-gray-500 text-[10px]">Click to minimize</span>
+            </div>
+            <div className="space-y-1">
+              <div>Drag empty canvas = Pan</div>
+              <div><kbd className="bg-gray-700 px-1 rounded">Space</kbd> + Drag = Pan (anytime)</div>
+              <div><kbd className="bg-gray-700 px-1 rounded">Scroll</kbd> = Zoom</div>
+              <div><kbd className="bg-gray-700 px-1 rounded">Shift</kbd> + Click = Multi-select</div>
+              <div><kbd className="bg-gray-700 px-1 rounded">Delete</kbd> = Delete selected</div>
+              <div><kbd className="bg-gray-700 px-1 rounded">Arrow Keys</kbd> = Move selected shape</div>
+              <div><kbd className="bg-gray-700 px-1 rounded">Shift</kbd> + <kbd className="bg-gray-700 px-1 rounded">Arrow</kbd> = Move faster (5x)</div>
+              <div><kbd className="bg-gray-700 px-1 rounded">Cmd/Ctrl</kbd> + <kbd className="bg-gray-700 px-1 rounded">D</kbd> = Duplicate selected</div>
+              <div><kbd className="bg-gray-700 px-1 rounded">Cmd/Ctrl</kbd> + <kbd className="bg-gray-700 px-1 rounded">C</kbd> = Copy selected</div>
+              <div><kbd className="bg-gray-700 px-1 rounded">Cmd/Ctrl</kbd> + <kbd className="bg-gray-700 px-1 rounded">V</kbd> = Paste from clipboard</div>
+              <div>Color Picker = Select shape(s) to see properties panel</div>
+              <div>Alignment Tools = Select 2+ shapes to see alignment toolbar</div>
+            </div>
+          </div>
+        ) : (
+          // Minimized button - 60x60px circle with "?"
+          <button
+            onClick={() => setControlsOpen(true)}
+            className="w-15 h-15 bg-gray-800 border border-gray-700 rounded-full flex items-center justify-center text-white font-bold text-xl hover:bg-gray-700 hover:border-gray-600 transition-colors shadow-lg"
+            style={{ width: '50px', height: '50px' }}
+            title="Show keyboard controls"
+          >
+            ?
+          </button>
+        )}
       </div>
     </main>
   )

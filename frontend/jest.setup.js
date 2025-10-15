@@ -31,6 +31,19 @@ Object.defineProperty(window, 'matchMedia', {
 })
 
 /**
+ * Mock ResizeObserver
+ * 
+ * WHY: ResizeObserver is not available in jsdom (test environment).
+ * The Canvas component uses it to detect container size changes.
+ * We mock it to prevent tests from failing.
+ */
+global.ResizeObserver = jest.fn().mockImplementation(() => ({
+  observe: jest.fn(),
+  unobserve: jest.fn(),
+  disconnect: jest.fn(),
+}))
+
+/**
  * Suppress console errors during tests (optional)
  * 
  * Uncomment if you want to hide expected errors in test output.

@@ -404,9 +404,145 @@ This document outlines the complete implementation plan for the Figma clone proj
 
 ---
 
-## Phase 6: AI Integration (TDD)
+## Phase 6: Advanced Canvas Features (Polish)
 
-### PR #24: OpenAI Integration Tests
+### PR #24: Arrow Key Movement
+**Status:** Pending
+**Priority:** HIGH - Quick win, 2 points, 15 minutes
+
+**Tasks:**
+- Add keyboard handler for Arrow keys (Up, Down, Left, Right)
+- Move selected shape(s) by 1px per key press
+- Add Shift+Arrow for 10px movement (faster)
+- Ensure arrow keys don't interfere with text editing
+- Test with single and multi-select
+
+**Why:** Essential keyboard shortcut for precise positioning. Tier 1 feature worth 2 points.
+
+**Implementation Notes:**
+```typescript
+// In Canvas.tsx handleKeyDown, add:
+if (!isTyping && selectedIds.length > 0) {
+  const moveAmount = e.shiftKey ? 10 : 1;
+  if (e.key === 'ArrowUp') { /* move y -= moveAmount */ }
+  // Similar for other arrows
+}
+```
+
+---
+
+### PR #25: Duplicate Shapes (Cmd+D)
+**Status:** Pending
+**Priority:** HIGH - Quick win, 2 points, 20 minutes
+
+**Tasks:**
+- Add Cmd+D / Ctrl+D keyboard shortcut
+- Clone selected shape(s) with new ID
+- Offset duplicates by 20px x/y
+- Auto-select the duplicated shapes
+- Work with multi-select
+
+**Why:** Common design tool feature. Tier 1 feature worth 2 points. Foundation for copy/paste.
+
+**Implementation Notes:**
+```typescript
+// In Canvas.tsx handleKeyDown:
+if ((e.metaKey || e.ctrlKey) && e.key === 'd' && !isTyping) {
+  e.preventDefault();
+  selectedIds.forEach(id => {
+    const shape = shapes.get(id);
+    if (shape) {
+      const duplicate = { ...shape, id: generateId(), x: shape.x + 20, y: shape.y + 20 };
+      addShape(duplicate);
+    }
+  });
+}
+```
+
+---
+
+### PR #26: Copy/Paste (Cmd+C, Cmd+V)
+**Status:** Pending
+**Priority:** HIGH - Quick win, 2 points, 25 minutes
+
+**Tasks:**
+- Add Cmd+C / Ctrl+C to copy selected shapes
+- Add Cmd+V / Ctrl+V to paste from clipboard
+- Store copied shapes in component ref (not browser clipboard)
+- Offset pasted shapes by 30px x/y
+- Support multi-select copy/paste
+- Auto-select pasted shapes
+
+**Why:** Essential design tool feature. Tier 1 feature worth 2 points.
+
+**Implementation Notes:**
+```typescript
+// Add to Canvas component:
+const clipboardRef = useRef<Shape[]>([]);
+
+// Copy: clipboardRef.current = selectedIds.map(id => shapes.get(id))
+// Paste: clipboardRef.current.forEach(shape => addShape({...shape, id: generateId(), x: x+30, y: y+30}))
+```
+
+---
+
+### PR #27: Color Picker for Shapes
+**Status:** Pending
+**Priority:** MEDIUM - Good UX, 0 points (4th Tier 1), 45 minutes
+
+**Tasks:**
+- Create PropertiesPanel component
+- Show panel when shape(s) selected
+- Add native `<input type="color">` for color selection
+- Update all selected shapes when color changes
+- Position panel in top-right corner
+- Add label and styling
+
+**Why:** Makes color editing intuitive. Doesn't count for scoring (4th Tier 1 feature) but improves UX.
+
+**Implementation Notes:**
+```typescript
+// Create frontend/components/PropertiesPanel.tsx
+// Show color picker for selected shapes
+// Use native HTML5 color input for simplicity
+```
+
+---
+
+### PR #28: Alignment Tools
+**Status:** Pending
+**Priority:** HIGH - Tier 2 feature, 3 points, 60 minutes
+
+**Tasks:**
+- Add alignment functions to canvasStore:
+  - `alignShapesLeft()` - align to leftmost x
+  - `alignShapesRight()` - align to rightmost x
+  - `alignShapesTop()` - align to topmost y
+  - `alignShapesBottom()` - align to bottommost y
+  - `distributeHorizontally()` - even spacing on x-axis
+  - `distributeVertically()` - even spacing on y-axis
+- Add alignment button toolbar (or context menu)
+- Only enable when 2+ shapes selected
+- Test with various shape types
+
+**Why:** Professional design tool feature. Tier 2 feature worth 3 points.
+
+**Implementation Notes:**
+```typescript
+// In canvasStore.ts, add:
+alignShapesLeft: () => {
+  const selectedShapes = state.selectedIds.map(id => state.shapes.get(id));
+  const minX = Math.min(...selectedShapes.map(s => s.x));
+  selectedIds.forEach(id => updateShape(id, { x: minX }));
+}
+// Similar for other alignment functions
+```
+
+---
+
+## Phase 7: AI Integration (TDD)
+
+### PR #29: OpenAI Integration Tests
 **Status:** Pending
 **TDD Step:** ✍️ WRITE TESTS FIRST
 
@@ -419,7 +555,7 @@ This document outlines the complete implementation plan for the Figma clone proj
 
 ---
 
-### PR #25: OpenAI Integration Implementation
+### PR #30: OpenAI Integration Implementation
 **Status:** Pending
 **TDD Step:** ✅ MAKE TESTS PASS
 
@@ -431,13 +567,13 @@ This document outlines the complete implementation plan for the Figma clone proj
 - Parse and validate function call responses
 - Add rate limiting and error handling
 - Log all AI interactions
-- **Run tests from PR #24 - all should pass**
+- **Run tests from PR #29 - all should pass**
 
-**Why:** (TDD) Implement OpenAI integration to pass all tests from PR #24.
+**Why:** (TDD) Implement OpenAI integration to pass all tests from PR #29.
 
 ---
 
-### PR #26: AI Canvas Operations Tests
+### PR #31: AI Canvas Operations Tests
 **Status:** Pending
 **TDD Step:** ✍️ WRITE TESTS FIRST
 
@@ -451,7 +587,7 @@ This document outlines the complete implementation plan for the Figma clone proj
 
 ---
 
-### PR #27: AI Canvas Operations Implementation
+### PR #32: AI Canvas Operations Implementation
 **Status:** Pending
 **TDD Step:** ✅ MAKE TESTS PASS
 
@@ -464,13 +600,13 @@ This document outlines the complete implementation plan for the Figma clone proj
 - Implement arrangeShapes operation (horizontal, vertical, grid layouts with spacing)
 - Implement groupShapes operation
 - Broadcast all AI operations to connected clients via Yjs
-- **Run tests from PR #26 - all should pass**
+- **Run tests from PR #31 - all should pass**
 
-**Why:** (TDD) Implement AI canvas operations to pass all tests from PR #26.
+**Why:** (TDD) Implement AI canvas operations to pass all tests from PR #31.
 
 ---
 
-### PR #28: AI Assistant UI Tests
+### PR #33: AI Assistant UI Tests
 **Status:** Pending
 **TDD Step:** ✍️ WRITE TESTS FIRST
 
@@ -483,7 +619,7 @@ This document outlines the complete implementation plan for the Figma clone proj
 
 ---
 
-### PR #29: AI Assistant UI Implementation
+### PR #34: AI Assistant UI Implementation
 **Status:** Pending
 **TDD Step:** ✅ MAKE TESTS PASS
 
@@ -496,15 +632,15 @@ This document outlines the complete implementation plan for the Figma clone proj
 - Implement command history
 - Add error handling and user-friendly error messages
 - Style with TailwindCSS
-- **Run tests from PR #28 - all should pass**
+- **Run tests from PR #33 - all should pass**
 
-**Why:** (TDD) Implement AI UI to pass all tests from PR #28.
+**Why:** (TDD) Implement AI UI to pass all tests from PR #33.
 
 ---
 
-## Phase 7: Optimization & Security
+## Phase 8: Optimization & Security
 
-### PR #30: Performance Optimization
+### PR #35: Performance Optimization
 **Status:** Pending
 
 **Tasks:**
@@ -522,7 +658,7 @@ This document outlines the complete implementation plan for the Figma clone proj
 
 ---
 
-### PR #31: Security Hardening
+### PR #36: Security Hardening
 **Status:** Pending
 
 **Tasks:**
@@ -541,7 +677,7 @@ This document outlines the complete implementation plan for the Figma clone proj
 
 ---
 
-### PR #32: Error Handling & Logging
+### PR #37: Error Handling & Logging
 **Status:** Pending
 
 **Tasks:**
@@ -560,9 +696,9 @@ This document outlines the complete implementation plan for the Figma clone proj
 
 ---
 
-## Phase 8: Polish & Deployment
+## Phase 9: Polish & Deployment
 
-### PR #33: UI/UX Polish & Styling
+### PR #38: UI/UX Polish & Styling
 **Status:** Pending
 
 **Tasks:**
@@ -582,7 +718,7 @@ This document outlines the complete implementation plan for the Figma clone proj
 
 ---
 
-### PR #34: Deployment Preparation
+### PR #39: Deployment Preparation
 **Status:** Pending
 
 **Tasks:**
@@ -601,7 +737,7 @@ This document outlines the complete implementation plan for the Figma clone proj
 
 ---
 
-### PR #35: Supabase Setup & Configuration
+### PR #40: Supabase Setup & Configuration
 **Status:** Pending
 
 **Tasks:**
@@ -620,7 +756,7 @@ This document outlines the complete implementation plan for the Figma clone proj
 
 ---
 
-### PR #36: Backend Deployment to Render
+### PR #41: Backend Deployment to Render
 **Status:** Pending
 
 **Tasks:**
@@ -640,7 +776,7 @@ This document outlines the complete implementation plan for the Figma clone proj
 
 ---
 
-### PR #37: Frontend Deployment to Vercel
+### PR #42: Frontend Deployment to Vercel
 **Status:** Pending
 
 **Tasks:**
@@ -660,9 +796,9 @@ This document outlines the complete implementation plan for the Figma clone proj
 
 ---
 
-## Phase 9: Launch
+## Phase 10: Launch
 
-### PR #38: End-to-End Integration Testing
+### PR #43: End-to-End Integration Testing
 **Status:** Pending
 
 **Tasks:**
@@ -681,7 +817,7 @@ This document outlines the complete implementation plan for the Figma clone proj
 
 ---
 
-### PR #39: Final Documentation & Cleanup
+### PR #44: Final Documentation & Cleanup
 **Status:** Pending
 
 **Tasks:**
@@ -704,19 +840,20 @@ This document outlines the complete implementation plan for the Figma clone proj
 
 ## Summary
 
-- **Total PRs:** 39 (up from 28 due to TDD approach)
-- **Estimated Timeline:** 10-14 weeks (due to proper TDD implementation)
+- **Total PRs:** 44 (increased from 39 after adding Advanced Canvas Features phase)
+- **Estimated Timeline:** 11-15 weeks (due to proper TDD implementation + polish features)
 - **TDD Impact:** Tests are now written BEFORE implementation for every feature
 - **Key Milestones:**
-  - Phase 1 complete: Foundation & testing setup
-  - Phase 2 complete: Basic canvas functionality (with tests)
-  - Phase 3 complete: Real-time collaboration working (with tests)
-  - Phase 4 complete: Backend & persistence (with tests)
-  - Phase 5 complete: Authentication (with tests)
-  - Phase 6 complete: AI assistant functional (with tests)
-  - Phase 7 complete: Performance & security hardened
-  - Phase 8 complete: Production deployment
-  - Phase 9 complete: v1.0.0 release
+  - Phase 1 complete: Foundation & testing setup (PRs #1-3)
+  - Phase 2 complete: Basic canvas functionality with tests (PRs #4-9)
+  - Phase 3 complete: Real-time collaboration working with tests (PRs #10-15)
+  - Phase 4 complete: Backend & persistence with tests (PRs #16-19)
+  - Phase 5 complete: Authentication with tests (PRs #20-23)
+  - **Phase 6 complete: Advanced canvas features for better scoring (PRs #24-28)** ⭐ NEW!
+  - Phase 7 complete: AI assistant functional with tests (PRs #29-34)
+  - Phase 8 complete: Performance & security hardened (PRs #35-37)
+  - Phase 9 complete: Production deployment (PRs #38-42)
+  - Phase 10 complete: v1.0.0 release (PRs #43-44)
 
 ## Notes
 
@@ -731,4 +868,31 @@ This document outlines the complete implementation plan for the Figma clone proj
 - Maintain test coverage above 80%
 - Keep PRs focused and atomic for easier review
 - Tests ensure quality and catch regressions early
+
+## Scoring Impact - Phase 6 Features
+
+**Why Phase 6 was added:** To maximize rubric scoring for "Advanced Figma-Inspired Features"
+
+**Phase 6 Score Potential:** +9 points
+- PR #24: Arrow Keys (Tier 1) → **+2 points**
+- PR #25: Duplicate (Tier 1) → **+2 points**
+- PR #26: Copy/Paste (Tier 1) → **+2 points**
+- PR #27: Color Picker (Tier 1) → +0 points (4th Tier 1 feature, max is 3)
+- PR #28: Alignment Tools (Tier 2) → **+3 points**
+
+**Total Estimated Time:** ~2.5 hours
+**Strategic Value:** These features are quick to implement and won't break existing functionality
+
+**Implementation Order Rationale:**
+1. **Arrow Keys** - Simplest, proves keyboard shortcuts work
+2. **Duplicate** - Builds foundation for copy/paste
+3. **Copy/Paste** - Extends duplicate logic
+4. **Color Picker** - Independent feature, good UX even if doesn't count for points
+5. **Alignment Tools** - Most complex, highest value (Tier 2 = 3 points)
+
+**Risk Assessment:** All features are 🟢 Zero risk
+- Use existing store methods (`updateShape`, `addShape`)
+- No changes to data models or sync logic
+- Won't interfere with AI agent implementation (Phase 7)
+- Can be implemented in any order (no dependencies)
 

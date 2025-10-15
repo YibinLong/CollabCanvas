@@ -426,27 +426,25 @@ This document outlines the complete implementation plan for the Figma clone proj
 ## Phase 6: Advanced Canvas Features (Polish)
 
 ### PR #24: Arrow Key Movement
-**Status:** Pending
-**Priority:** HIGH - Quick win, 2 points, 15 minutes
+**Status:** ✅ COMPLETE
+**Priority:** HIGH - Quick win, 2 points, COMPLETED
 
 **Tasks:**
-- Add keyboard handler for Arrow keys (Up, Down, Left, Right)
-- Move selected shape(s) by 1px per key press
-- Add Shift+Arrow for 10px movement (faster)
-- Ensure arrow keys don't interfere with text editing
-- Test with single and multi-select
+- ✅ Add keyboard handler for Arrow keys (Up, Down, Left, Right)
+- ✅ Move selected shape(s) by 20px per key press
+- ✅ Add Shift+Arrow for 100px movement (faster - 5x)
+- ✅ Ensure arrow keys don't interfere with text editing
+- ✅ Test with single and multi-select
+- ✅ All 9 tests passing
 
 **Why:** Essential keyboard shortcut for precise positioning. Tier 1 feature worth 2 points.
 
-**Implementation Notes:**
-```typescript
-// In Canvas.tsx handleKeyDown, add:
-if (!isTyping && selectedIds.length > 0) {
-  const moveAmount = e.shiftKey ? 10 : 1;
-  if (e.key === 'ArrowUp') { /* move y -= moveAmount */ }
-  // Similar for other arrows
-}
-```
+**Implementation:**
+- Arrow keys move shapes 20px at a time
+- Shift+Arrow moves shapes 100px (5x faster)
+- Works with all shape types including lines
+- Respects canvas grid boundaries
+- Uses `getState()` to avoid stale closures
 
 ---
 
@@ -867,8 +865,10 @@ alignShapesLeft: () => {
   - ✅ Phase 2 complete: Basic canvas functionality with tests (PRs #4-9)
   - ✅ Phase 3 complete: Real-time collaboration working with tests (PRs #10-15)
   - ✅ Phase 4 complete: Backend & persistence with tests (PRs #16-19)
-  - ✅ **Phase 5 complete: Authentication with tests (PRs #20-23)** 🔐 JUST COMPLETED!
-  - ⏳ Phase 6 pending: Advanced canvas features for better scoring (PRs #24-28) ⭐ NEXT!
+  - ✅ Phase 5 complete: Authentication with tests (PRs #20-23)
+  - ⏳ **Phase 6 in progress: Advanced canvas features for better scoring (PRs #24-28)** ⭐ 1/5 DONE!
+    - ✅ PR #24: Arrow Key Movement (COMPLETE)
+    - ⏳ PR #25-28: Remaining features
   - Phase 7 pending: AI assistant functional with tests (PRs #29-34)
   - Phase 8 pending: Performance & security hardened (PRs #35-37)
   - Phase 9 pending: Production deployment (PRs #38-42)

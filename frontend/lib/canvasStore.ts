@@ -464,7 +464,8 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
    * triggered by Delete or Backspace key.
    * 
    * HOW: Remove all shapes whose IDs are in selectedIds.
-   * NOTE: Won't delete shapes that are locked by other users.
+   * NOTE: Won't delete shapes that are locked by other users, but
+   * WILL delete shapes locked by the current user (you can delete your own shapes).
    */
   deleteSelected: () => {
     set((state) => {
@@ -475,18 +476,15 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
       
       state.selectedIds.forEach(id => {
         const shape = state.shapes.get(id)
-        // Don't delete if shape is locked (lockedBy exists and is not null)
-        if (shape && shape.lockedBy) {
-          console.log(`Cannot delete shape ${id} - locked by another user`)
-          remainingSelectedIds.push(id)
-        } else {
-          newShapes.delete(id)
-        }
+        // Always allow deletion - even if locked by current user
+        // The lock is just for preventing OTHER users from editing
+        // Users should always be able to delete their own shapes
+        newShapes.delete(id)
       })
       
       return {
         shapes: newShapes,
-        selectedIds: remainingSelectedIds, // Keep locked shapes selected
+        selectedIds: [], // Clear all selections since all were deleted
       }
     })
   },

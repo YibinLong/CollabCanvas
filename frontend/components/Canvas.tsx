@@ -31,6 +31,8 @@ import Line from './shapes/Line'
 import Text from './shapes/Text'
 import ResizeHandles, { type HandlePosition } from './ResizeHandles'
 import CursorOverlay from './CursorOverlay'
+import AlignmentToolbar from './AlignmentToolbar'
+import PropertiesPanel from './PropertiesPanel'
 import type { Shape } from '@/types/canvas'
 
 // Interaction modes
@@ -170,6 +172,7 @@ export default function Canvas({ provider, users, updateCursor, currentUser }: C
     zoomViewport, 
     resetViewport,
     selectShape, 
+    selectMultiple,
     clearSelection,
     addShape,
     updateShape,
@@ -203,6 +206,18 @@ export default function Canvas({ provider, users, updateCursor, currentUser }: C
   const svgRef = useRef<SVGSVGElement>(null)
   const [interactionMode, setInteractionMode] = useState<InteractionMode>('none')
   const [isSpacePressed, setIsSpacePressed] = useState(false)
+  
+  /**
+   * Clipboard for copy/paste functionality
+   * 
+   * WHY: Store copied shapes in memory (not browser clipboard).
+   * This allows us to preserve exact shape properties and supports
+   * pasting multiple times from the same copy operation.
+   * 
+   * WHAT: An array of shapes that were copied.
+   * When user presses Cmd+V, we clone these shapes with new IDs and 30px offset.
+   */
+  const clipboardRef = useRef<Shape[]>([])
   
   // State for tracking interactions
   const interactionStateRef = useRef<{
@@ -739,6 +754,27 @@ export default function Canvas({ provider, users, updateCursor, currentUser }: C
         selectShape(interactionStateRef.current.creatingShapeId)
       }
     }
+    
+    // Release locks when finishing moving or resizing
+    // WHY: After user finishes interacting with shapes, unlock them
+    // so they can be edited by others (in multiplayer) or deleted
+    if (interactionMode === 'moving' || interactionMode === 'resizing') {
+      // Unlock all currently selected shapes that were being moved
+      if (interactionMode === 'moving' && interactionStateRef.current.initialShapes) {
+        // Moving multiple shapes - unlock all of them
+        interactionStateRef.current.initialShapes.forEach((shape, id) => {
+          unlockShape(id)
+        })
+      } else if (interactionStateRef.current.shapeId) {
+        // Resizing or moving single shape - unlock it
+        unlockShape(interactionStateRef.current.shapeId)
+      }
+      
+      // Also unlock all selected shapes as a safety measure
+      selectedIds.forEach(id => {
+        unlockShape(id)
+      })
+    }
 
     setInteractionMode('none')
     interactionStateRef.current = {
@@ -977,6 +1013,82 @@ export default function Canvas({ provider, users, updateCursor, currentUser }: C
           })
           
           // Auto-select the duplicated shapes (Figma behavior)
+          if (newShapeIds.length > 0) {
+            if (newShapeIds.length === 1) {
+              selectShape(newShapeIds[0])
+            } else {
+              selectMultiple(newShapeIds)
+            }
+          }
+        }
+      }
+      
+      // Copy selected shapes (Cmd+C / Ctrl+C)
+      // WHY: Copy is a fundamental workflow in design tools (Figma-like)
+      // Stores selected shapes in clipboard for later pasting
+      // NOTE: We use getState() to avoid stale closures in the event handler
+      if ((e.metaKey || e.ctrlKey) && e.key === 'c' && !isTyping) {
+        e.preventDefault()
+        
+        const currentState = useCanvasStore.getState()
+        const currentSelectedIds = currentState.selectedIds
+        const currentShapes = currentState.shapes
+        
+        if (currentSelectedIds.length > 0) {
+          // Copy all selected shapes to clipboard
+          clipboardRef.current = currentSelectedIds
+            .map(id => currentShapes.get(id))
+            .filter(Boolean) as Shape[]
+        }
+      }
+      
+      // Paste from clipboard (Cmd+V / Ctrl+V)
+      // WHY: Paste completes the copy/paste workflow (Figma-like)
+      // Creates new shapes from clipboard with 30px offset for visibility
+      // NOTE: We use getState() to avoid stale closures in the event handler
+      if ((e.metaKey || e.ctrlKey) && e.key === 'v' && !isTyping) {
+        e.preventDefault()
+        
+        if (clipboardRef.current.length > 0) {
+          const newShapeIds: string[] = []
+          
+          // Paste each shape from clipboard
+          clipboardRef.current.forEach(shape => {
+            // Generate new ID for the pasted shape
+            const newId = generateId()
+            newShapeIds.push(newId)
+            
+            // Clone the shape with 30px offset
+            let pasted: Shape
+            
+            if (shape.type === 'line') {
+              // Lines need both endpoints offset
+              pasted = {
+                ...shape,
+                id: newId,
+                x: shape.x + 30,
+                y: shape.y + 30,
+                x2: shape.x2 + 30,
+                y2: shape.y2 + 30,
+                lockedBy: null,
+                lockedAt: null,
+              }
+            } else {
+              // Other shapes just offset x, y
+              pasted = {
+                ...shape,
+                id: newId,
+                x: shape.x + 30,
+                y: shape.y + 30,
+                lockedBy: null,
+                lockedAt: null,
+              }
+            }
+            
+            addShape(pasted)
+          })
+          
+          // Auto-select the pasted shapes (Figma behavior)
           if (newShapeIds.length > 0) {
             if (newShapeIds.length === 1) {
               selectShape(newShapeIds[0])
@@ -1488,6 +1600,12 @@ export default function Canvas({ provider, users, updateCursor, currentUser }: C
         canvasWidth={clientWidth ?? undefined}
         canvasHeight={clientHeight ?? undefined}
       />
+      
+      {/* Alignment toolbar - shows when 2+ shapes selected */}
+      <AlignmentToolbar />
+      
+      {/* Properties panel (color picker) - shows when shapes selected */}
+      <PropertiesPanel />
     </div>
   )
 }

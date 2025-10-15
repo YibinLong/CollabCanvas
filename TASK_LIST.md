@@ -449,111 +449,113 @@ This document outlines the complete implementation plan for the Figma clone proj
 ---
 
 ### PR #25: Duplicate Shapes (Cmd+D)
-**Status:** Pending
-**Priority:** HIGH - Quick win, 2 points, 20 minutes
+**Status:** ✅ COMPLETE
+**Priority:** HIGH - Quick win, 2 points, COMPLETED
 
 **Tasks:**
-- Add Cmd+D / Ctrl+D keyboard shortcut
-- Clone selected shape(s) with new ID
-- Offset duplicates by 20px x/y
-- Auto-select the duplicated shapes
-- Work with multi-select
+- ✅ Add Cmd+D / Ctrl+D keyboard shortcut
+- ✅ Clone selected shape(s) with new ID
+- ✅ Offset duplicates by 20px x/y
+- ✅ Auto-select the duplicated shapes
+- ✅ Work with multi-select
+- ✅ Handle line shapes correctly (both endpoints offset)
+- ✅ All 7 tests passing
 
 **Why:** Common design tool feature. Tier 1 feature worth 2 points. Foundation for copy/paste.
 
-**Implementation Notes:**
-```typescript
-// In Canvas.tsx handleKeyDown:
-if ((e.metaKey || e.ctrlKey) && e.key === 'd' && !isTyping) {
-  e.preventDefault();
-  selectedIds.forEach(id => {
-    const shape = shapes.get(id);
-    if (shape) {
-      const duplicate = { ...shape, id: generateId(), x: shape.x + 20, y: shape.y + 20 };
-      addShape(duplicate);
-    }
-  });
-}
-```
+**Implementation:**
+- Cmd+D / Ctrl+D duplicates all selected shapes with 20px offset
+- Generates new IDs for duplicates and clears lock fields
+- Auto-selects duplicated shapes (Figma behavior)
+- Special handling for lines (offsets both x,y and x2,y2)
+- Doesn't interfere with text input
 
 ---
 
 ### PR #26: Copy/Paste (Cmd+C, Cmd+V)
-**Status:** Pending
-**Priority:** HIGH - Quick win, 2 points, 25 minutes
+**Status:** ✅ COMPLETE
+**Priority:** HIGH - Quick win, 2 points, COMPLETED
 
 **Tasks:**
-- Add Cmd+C / Ctrl+C to copy selected shapes
-- Add Cmd+V / Ctrl+V to paste from clipboard
-- Store copied shapes in component ref (not browser clipboard)
-- Offset pasted shapes by 30px x/y
-- Support multi-select copy/paste
-- Auto-select pasted shapes
+- ✅ Add Cmd+C / Ctrl+C to copy selected shapes
+- ✅ Add Cmd+V / Ctrl+V to paste from clipboard
+- ✅ Store copied shapes in component ref (not browser clipboard)
+- ✅ Offset pasted shapes by 30px x/y
+- ✅ Support multi-select copy/paste
+- ✅ Auto-select pasted shapes
+- ✅ Handle line shapes correctly (both endpoints offset)
+- ✅ Paste multiple times from same copy
+- ✅ All 9 tests passing
 
 **Why:** Essential design tool feature. Tier 1 feature worth 2 points.
 
-**Implementation Notes:**
-```typescript
-// Add to Canvas component:
-const clipboardRef = useRef<Shape[]>([]);
-
-// Copy: clipboardRef.current = selectedIds.map(id => shapes.get(id))
-// Paste: clipboardRef.current.forEach(shape => addShape({...shape, id: generateId(), x: x+30, y: y+30}))
-```
+**Implementation:**
+- Uses `clipboardRef` to store shapes in memory (not browser clipboard)
+- Cmd+C / Ctrl+C copies all selected shapes to clipboard
+- Cmd+V / Ctrl+V pastes with 30px offset (different from 20px duplicate offset)
+- Supports multiple paste operations from single copy
+- Clears lock fields on pasted shapes
+- Auto-selects pasted shapes (Figma behavior)
+- Special handling for lines (offsets both x,y and x2,y2)
+- Doesn't interfere with text input
 
 ---
 
 ### PR #27: Color Picker for Shapes
-**Status:** Pending
-**Priority:** MEDIUM - Good UX, 0 points (4th Tier 1), 45 minutes
+**Status:** ✅ COMPLETE
+**Priority:** MEDIUM - Good UX, 0 points (4th Tier 1), COMPLETED
 
 **Tasks:**
-- Create PropertiesPanel component
-- Show panel when shape(s) selected
-- Add native `<input type="color">` for color selection
-- Update all selected shapes when color changes
-- Position panel in top-right corner
-- Add label and styling
+- ✅ Create PropertiesPanel component
+- ✅ Show panel when shape(s) selected
+- ✅ Add native `<input type="color">` for color selection
+- ✅ Update all selected shapes when color changes
+- ✅ Position panel in top-right corner
+- ✅ Add label and styling
+- ✅ Add hex value text input
+- ✅ All 8 tests passing
 
 **Why:** Makes color editing intuitive. Doesn't count for scoring (4th Tier 1 feature) but improves UX.
 
-**Implementation Notes:**
-```typescript
-// Create frontend/components/PropertiesPanel.tsx
-// Show color picker for selected shapes
-// Use native HTML5 color input for simplicity
-```
+**Implementation:**
+- PropertiesPanel component created in `frontend/components/PropertiesPanel.tsx`
+- Only visible when shapes are selected
+- Native HTML5 color picker for simplicity
+- Updates all selected shapes simultaneously (batch update for performance)
+- Works with all shape types (rect, circle, line, text)
+- Hex value input field for precise color control
+- Clean, modern UI positioned in top-right corner
 
 ---
 
 ### PR #28: Alignment Tools
-**Status:** Pending
-**Priority:** HIGH - Tier 2 feature, 3 points, 60 minutes
+**Status:** ✅ COMPLETE
+**Priority:** HIGH - Tier 2 feature, 3 points, COMPLETED
 
 **Tasks:**
-- Add alignment functions to canvasStore:
-  - `alignShapesLeft()` - align to leftmost x
-  - `alignShapesRight()` - align to rightmost x
-  - `alignShapesTop()` - align to topmost y
-  - `alignShapesBottom()` - align to bottommost y
-  - `distributeHorizontally()` - even spacing on x-axis
-  - `distributeVertically()` - even spacing on y-axis
-- Add alignment button toolbar (or context menu)
-- Only enable when 2+ shapes selected
-- Test with various shape types
+- ✅ Add alignment functions to canvasStore:
+  - ✅ `alignLeft()` - align to leftmost x
+  - ✅ `alignRight()` - align to rightmost x + width
+  - ✅ `alignTop()` - align to topmost y
+  - ✅ `alignBottom()` - align to bottommost y + height
+  - ✅ `distributeHorizontally()` - even spacing on x-axis
+  - ✅ `distributeVertically()` - even spacing on y-axis
+- ✅ Add AlignmentToolbar component
+- ✅ Only show when 2+ shapes selected
+- ✅ Distribution only shows with 3+ shapes selected
+- ✅ Test with various shape types
+- ✅ All 8 tests passing
 
 **Why:** Professional design tool feature. Tier 2 feature worth 3 points.
 
-**Implementation Notes:**
-```typescript
-// In canvasStore.ts, add:
-alignShapesLeft: () => {
-  const selectedShapes = state.selectedIds.map(id => state.shapes.get(id));
-  const minX = Math.min(...selectedShapes.map(s => s.x));
-  selectedIds.forEach(id => updateShape(id, { x: minX }));
-}
-// Similar for other alignment functions
-```
+**Implementation:**
+- AlignmentToolbar component created in `frontend/components/AlignmentToolbar.tsx`
+- Six alignment functions added to `canvasStore.ts`
+- Toolbar positioned at bottom center of canvas
+- Only visible when 2+ shapes selected (alignment) or 3+ shapes (distribution)
+- Works with all shape types (rect, circle, line, text)
+- Figma-style icons for intuitive UI
+- Handles edge/bounding box alignment correctly
 
 ---
 
@@ -866,9 +868,13 @@ alignShapesLeft: () => {
   - ✅ Phase 3 complete: Real-time collaboration working with tests (PRs #10-15)
   - ✅ Phase 4 complete: Backend & persistence with tests (PRs #16-19)
   - ✅ Phase 5 complete: Authentication with tests (PRs #20-23)
-  - ⏳ **Phase 6 in progress: Advanced canvas features for better scoring (PRs #24-28)** ⭐ 1/5 DONE!
-    - ✅ PR #24: Arrow Key Movement (COMPLETE)
-    - ⏳ PR #25-28: Remaining features
+  - ✅ **Phase 6 COMPLETE: Advanced canvas features for better scoring (PRs #24-28)** ⭐ 5/5 DONE!
+    - ✅ PR #24: Arrow Key Movement (9 tests passing)
+    - ✅ PR #25: Duplicate Shapes (7 tests passing)
+    - ✅ PR #26: Copy/Paste (9 tests passing)
+    - ✅ PR #27: Color Picker (8 tests passing)
+    - ✅ PR #28: Alignment Tools (8 tests passing)
+    - **Total: 41 tests passing, +9 points potential**
   - Phase 7 pending: AI assistant functional with tests (PRs #29-34)
   - Phase 8 pending: Performance & security hardened (PRs #35-37)
   - Phase 9 pending: Production deployment (PRs #38-42)

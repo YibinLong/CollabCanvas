@@ -5,19 +5,79 @@
  * Users need quick access to alignment and distribution functions.
  * 
  * WHAT: A floating toolbar that shows:
+ * - "Alignment" label so users know what this toolbar does
  * - Align Left, Right, Top, Bottom buttons
- * - Distribute Horizontally, Vertically buttons
+ * - Distribute Horizontally, Vertically buttons (when 3+ shapes selected)
+ * - Hover tooltips showing the name of each tool (like Figma)
  * - Only visible when 2+ shapes are selected
  * 
  * HOW:
  * - Renders only when multiple shapes are selected
  * - Calls alignment functions from canvasStore
+ * - Uses custom tooltips (like UserAvatars) with group-hover pattern
  * - Styled like Figma's alignment toolbar
  */
 
 'use client'
 
 import { useCanvasStore } from '@/lib/canvasStore'
+
+/**
+ * AlignmentButton - Reusable button with tooltip
+ * 
+ * WHY: Each alignment button needs consistent styling and tooltip behavior.
+ * This component ensures all buttons look and work the same way.
+ * 
+ * @param onClick - Function to call when clicked
+ * @param testId - Test ID for testing
+ * @param label - Text to show in tooltip
+ * @param children - SVG icon to display
+ */
+interface AlignmentButtonProps {
+  onClick: () => void
+  testId: string
+  label: string
+  children: React.ReactNode
+}
+
+function AlignmentButton({ onClick, testId, label, children }: AlignmentButtonProps) {
+  return (
+    <div className="relative group">
+      <button
+        data-testid={testId}
+        onClick={onClick}
+        className="p-2 hover:bg-gray-100 rounded transition-colors"
+      >
+        {children}
+      </button>
+      
+      {/* Custom tooltip (appears on hover) */}
+      <div
+        className="
+          absolute top-full mt-2 left-1/2 transform -translate-x-1/2
+          bg-gray-900 text-white text-xs px-2 py-1 rounded
+          whitespace-nowrap
+          opacity-0 group-hover:opacity-100
+          pointer-events-none
+          transition-opacity duration-200
+          z-50
+        "
+      >
+        {label}
+        {/* Tooltip arrow pointing up */}
+        <div
+          className="
+            absolute bottom-full left-1/2 transform -translate-x-1/2
+            w-0 h-0
+            border-l-4 border-l-transparent
+            border-r-4 border-r-transparent
+            border-b-4 border-b-gray-900
+          "
+        />
+      </div>
+    </div>
+  )
+}
 
 /**
  * AlignmentToolbar component
@@ -43,75 +103,75 @@ export default function AlignmentToolbar() {
   }
   
   return (
-    <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 bg-white rounded-lg shadow-lg p-2 flex items-center gap-1">
+    <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 bg-white rounded-lg shadow-lg p-3 flex items-center gap-3">
+      {/* Toolbar Label - tells users what this toolbar does */}
+      <span className="text-sm font-medium text-gray-700 pr-2 border-r border-gray-300">
+        Alignment
+      </span>
+      
       {/* Alignment Section */}
       <div className="flex gap-1 pr-2 border-r border-gray-300">
         {/* Align Left */}
-        <button
-          data-testid="align-left"
+        <AlignmentButton
           onClick={alignLeft}
-          className="p-2 hover:bg-gray-100 rounded transition-colors"
-          title="Align Left"
+          testId="align-left"
+          label="Align Left"
         >
           <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
             <rect x="3" y="3" width="2" height="14" fill="currentColor"/>
             <rect x="7" y="5" width="8" height="3" fill="currentColor"/>
             <rect x="7" y="12" width="6" height="3" fill="currentColor"/>
           </svg>
-        </button>
+        </AlignmentButton>
         
         {/* Align Right */}
-        <button
-          data-testid="align-right"
+        <AlignmentButton
           onClick={alignRight}
-          className="p-2 hover:bg-gray-100 rounded transition-colors"
-          title="Align Right"
+          testId="align-right"
+          label="Align Right"
         >
           <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
             <rect x="15" y="3" width="2" height="14" fill="currentColor"/>
             <rect x="5" y="5" width="8" height="3" fill="currentColor"/>
             <rect x="7" y="12" width="6" height="3" fill="currentColor"/>
           </svg>
-        </button>
+        </AlignmentButton>
         
         {/* Align Top */}
-        <button
-          data-testid="align-top"
+        <AlignmentButton
           onClick={alignTop}
-          className="p-2 hover:bg-gray-100 rounded transition-colors"
-          title="Align Top"
+          testId="align-top"
+          label="Align Top"
         >
           <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
             <rect x="3" y="3" width="14" height="2" fill="currentColor"/>
             <rect x="5" y="7" width="3" height="8" fill="currentColor"/>
             <rect x="12" y="7" width="3" height="6" fill="currentColor"/>
           </svg>
-        </button>
+        </AlignmentButton>
         
         {/* Align Bottom */}
-        <button
-          data-testid="align-bottom"
+        <AlignmentButton
           onClick={alignBottom}
-          className="p-2 hover:bg-gray-100 rounded transition-colors"
-          title="Align Bottom"
+          testId="align-bottom"
+          label="Align Bottom"
         >
           <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
             <rect x="3" y="15" width="14" height="2" fill="currentColor"/>
             <rect x="5" y="5" width="3" height="8" fill="currentColor"/>
             <rect x="12" y="7" width="3" height="6" fill="currentColor"/>
           </svg>
-        </button>
+        </AlignmentButton>
       </div>
       
       {/* Distribution Section - only show if 3+ shapes */}
       {selectedIds.length >= 3 && (
-        <div className="flex gap-1 pl-2">
+        <div className="flex gap-1">
           {/* Distribute Horizontally */}
-          <button
-            data-testid="distribute-horizontal"
+          <AlignmentButton
             onClick={distributeHorizontally}
-            className="p-2 hover:bg-gray-100 rounded transition-colors"
-            title="Distribute Horizontally"
+            testId="distribute-horizontal"
+            label="Distribute Horizontally"
           >
             <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
               <rect x="3" y="8" width="3" height="4" fill="currentColor"/>
@@ -120,14 +180,13 @@ export default function AlignmentToolbar() {
               <path d="M 6 10 L 8.5 10" stroke="currentColor" strokeDasharray="1,1"/>
               <path d="M 11.5 10 L 14 10" stroke="currentColor" strokeDasharray="1,1"/>
             </svg>
-          </button>
+          </AlignmentButton>
           
           {/* Distribute Vertically */}
-          <button
-            data-testid="distribute-vertical"
+          <AlignmentButton
             onClick={distributeVertically}
-            className="p-2 hover:bg-gray-100 rounded transition-colors"
-            title="Distribute Vertically"
+            testId="distribute-vertical"
+            label="Distribute Vertically"
           >
             <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
               <rect x="8" y="3" width="4" height="3" fill="currentColor"/>
@@ -136,12 +195,12 @@ export default function AlignmentToolbar() {
               <path d="M 10 6 L 10 8.5" stroke="currentColor" strokeDasharray="1,1"/>
               <path d="M 10 11.5 L 10 14" stroke="currentColor" strokeDasharray="1,1"/>
             </svg>
-          </button>
+          </AlignmentButton>
         </div>
       )}
       
-      {/* Label */}
-      <span className="text-xs text-gray-500 ml-2 hidden sm:inline">
+      {/* Selection count label */}
+      <span className="text-xs text-gray-500 pl-2 border-l border-gray-300 hidden sm:inline">
         {selectedIds.length} selected
       </span>
     </div>

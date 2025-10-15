@@ -78,9 +78,9 @@ interface CanvasStore {
  */
 // Grid boundaries configuration
 // WHY: Define a fixed grid size so the canvas has clear boundaries
-// WHAT: The grid is 4000x3000 pixels. Users start centered at (2000, 1500)
-export const GRID_WIDTH = 4000
-export const GRID_HEIGHT = 3000
+// WHAT: The grid is 8000x6000 pixels. Users start centered at (4000, 3000)
+export const GRID_WIDTH = 8000
+export const GRID_HEIGHT = 6000
 export const VIEWPORT_PADDING = 300 // How far user can scroll past grid edges
 export const DEFAULT_VIEWPORT_ZOOM = 0.6
 

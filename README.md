@@ -95,6 +95,7 @@ See [Frontend README](./frontend/README.md) and [Backend README](./backend/READM
 ## 🛠️ Tech Stack
 
 ### Frontend
+
 - **Next.js** - React framework with SSR
 - **TypeScript** - Type-safe JavaScript
 - **Zustand** - State management
@@ -103,6 +104,7 @@ See [Frontend README](./frontend/README.md) and [Backend README](./backend/READM
 - **Supabase JS** - Auth client
 
 ### Backend
+
 - **Node.js + Express** - REST API server
 - **TypeScript** - Type-safe JavaScript
 - **Yjs + y-websocket** - Real-time sync server
@@ -112,19 +114,78 @@ See [Frontend README](./frontend/README.md) and [Backend README](./backend/READM
 - **Supabase** - Authentication
 
 ### Infrastructure
+
 - **Vercel** - Frontend hosting
 - **Render** - Backend hosting
 - **Supabase** - Database and auth hosting
 
+## 🔒 Collaborative Editing Lock Strategy
+
+**WHY:** When multiple users edit the same shape simultaneously, conflicts can occur. Our lock strategy prevents this by ensuring only one user can modify a shape at a time.
+
+### How It Works
+
+1. **Lock Acquisition**
+   - When a user clicks to move or resize a shape, it's immediately locked with their user ID
+   - Other users cannot modify the locked shape until it's released
+   - The lock is timestamped to detect stale locks
+
+2. **Visual Feedback**
+   - **Red dashed border** appears around locked shapes
+   - **Lock icon (🔒)** displays above locked shapes
+   - Resize handles are hidden for shapes locked by others
+   - Console messages inform users when interactions are blocked
+
+3. **Automatic Lock Release**
+   - Locks release immediately when the user finishes their action (mouse up)
+   - **30-second timeout:** Stale locks auto-release if a user's browser crashes
+   - **5-second check interval:** System scans for and releases expired locks
+
+4. **Data Structure**
+
+   ```typescript
+   interface Shape {
+     // ... other properties
+     lockedBy?: string | null;  // User ID of current editor
+     lockedAt?: number | null;   // Timestamp for timeout detection
+   }
+   ```
+
+### User Experience
+
+**User A (has the lock):**
+
+- Clicks and drags a shape → shape locks immediately
+- Can move/resize freely
+- Lock releases on mouse up
+
+**User B (trying to edit the same shape):**
+
+- Sees red dashed border with lock icon
+- Click/drag is blocked with a console message
+- Must wait for User A to finish or for the 30s timeout
+
+**Benefits:**
+
+- ✅ Prevents conflicting edits and data corruption
+- ✅ Clear visual indicators show who's editing what
+- ✅ Automatic recovery from browser crashes via timeout
+- ✅ Lock state syncs in real-time via Yjs CRDT
+- ✅ Users can still select locked shapes (just can't modify them)
+
+For detailed implementation and testing instructions, see [Conflict Resolution Documentation](./docs/CONFLICT_RESOLUTION.md).
+
 ## 📖 Documentation
 
 ### Essential Docs
+
 - **[START_HERE.md](./docs/guides/START_HERE.md)** - New user entry point
 - **[PRD.md](./PRD.md)** - Complete product requirements
 - **[TASK_LIST.md](./TASK_LIST.md)** - 39 PRs from setup to production
 - **[Documentation Index](./docs/INDEX.md)** - Complete documentation map
 
 ### Quick Links
+
 - **[Quick Start Guide](./docs/guides/QUICK_START.md)** - Get up and running fast
 - **[Setup Database](./docs/guides/SETUP_DATABASE.md)** - Database configuration
 - **[Troubleshooting](./docs/guides/TROUBLESHOOTING.md)** - Common issues and fixes
@@ -133,6 +194,7 @@ See [Frontend README](./frontend/README.md) and [Backend README](./backend/READM
 - **[Deployment Guide](./docs/deployment/DEPLOYMENT_GUIDE.md)** - How to deploy
 
 ### Component Docs
+
 - **[Frontend README](./frontend/README.md)** - Frontend details
 - **[Backend README](./backend/README.md)** - Backend details
 
@@ -160,10 +222,12 @@ See [TASK_LIST.md](./TASK_LIST.md) for the complete 39-PR roadmap.
 - 🔄 **Phase 4:** Backend & Persistence (Pending)
 
 **Test Results:** 101/101 tests passing ✅
+
 - Backend: 32 tests
 - Frontend: 69 tests
 
 **⏭️ Next Steps:**
+
 - PR #16-17: Document Management API
 - PR #18-19: Yjs Persistence
 - PR #20-23: Authentication
@@ -182,7 +246,8 @@ See [TASK_LIST.md](./TASK_LIST.md) for what's coming next.
 ## 📝 Environment Variables
 
 ### Frontend (.env.local)
-```
+
+```env
 NEXT_PUBLIC_API_URL=http://localhost:4000
 NEXT_PUBLIC_WS_URL=ws://localhost:4001
 NEXT_PUBLIC_SUPABASE_URL=https://xxx.supabase.co
@@ -190,7 +255,8 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=your_key
 ```
 
 ### Backend (.env)
-```
+
+```env
 PORT=4000
 DATABASE_URL=postgresql://user:pass@localhost:5432/collabcanvas
 SUPABASE_URL=https://xxx.supabase.co
@@ -205,6 +271,7 @@ OPENAI_API_KEY=sk-your-key
 All project documentation is organized in the [`docs/`](./docs) folder:
 
 ### 📂 Directory Structure
+
 - **[docs/architecture/](./docs/architecture/)** - System design and structure
 - **[docs/guides/](./docs/guides/)** - Setup instructions and workflows
 - **[docs/testing/](./docs/testing/)** - Testing documentation
@@ -213,6 +280,7 @@ All project documentation is organized in the [`docs/`](./docs) folder:
 - **[docs/pr-completions/](./docs/pr-completions/)** - Detailed PR documentation
 
 ### 🔧 Scripts
+
 - **[scripts/START_TESTING.sh](./scripts/START_TESTING.sh)** - Run test suites
 - **[scripts/DEPLOY_NOW.sh](./scripts/DEPLOY_NOW.sh)** - Deployment automation
 
@@ -221,6 +289,7 @@ All project documentation is organized in the [`docs/`](./docs) folder:
 ## 🎯 Design Philosophy
 
 **For Beginners:**
+
 Every code file includes comments explaining:
 - **WHY** we're doing something
 - **WHAT** each piece of code does
@@ -243,4 +312,3 @@ MIT License - See LICENSE file for details
 ---
 
 Built with ❤️ using TDD principles
-

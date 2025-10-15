@@ -922,6 +922,63 @@ export default function Canvas({ provider, users, updateCursor, currentUser }: C
           deleteSelected()
         }
       }
+      
+      // Arrow keys to move selected shapes
+      // WHY: Arrow keys are essential for precise positioning in design tools (Figma-like)
+      // Users can nudge shapes by 20px (normal) or 100px (with Shift) for fine control
+      // NOTE: We use getState() to avoid stale closures in the event handler
+      const currentState = useCanvasStore.getState()
+      const currentSelectedIds = currentState.selectedIds
+      const currentShapes = currentState.shapes
+      
+      if (!isTyping && currentSelectedIds.length > 0) {
+        const moveAmount = e.shiftKey ? 100 : 20
+        let deltaX = 0
+        let deltaY = 0
+        
+        switch (e.key) {
+          case 'ArrowUp':
+            e.preventDefault()
+            deltaY = -moveAmount
+            break
+          case 'ArrowDown':
+            e.preventDefault()
+            deltaY = moveAmount
+            break
+          case 'ArrowLeft':
+            e.preventDefault()
+            deltaX = -moveAmount
+            break
+          case 'ArrowRight':
+            e.preventDefault()
+            deltaX = moveAmount
+            break
+        }
+        
+        // If we detected an arrow key, move the selected shapes
+        if (deltaX !== 0 || deltaY !== 0) {
+          // Build updates for all selected shapes
+          const updates: Array<{ id: string; updates: Partial<Shape> }> = []
+          
+          currentSelectedIds.forEach(id => {
+            const shape = currentShapes.get(id)
+            if (!shape) return
+            
+            // Calculate new position using the same logic as drag-move
+            const shapeUpdates = calculateMoveUpdates(shape, deltaX, deltaY)
+            
+            // Apply grid boundary constraints
+            const constrainedUpdates = constrainToGrid(shapeUpdates, shape)
+            
+            updates.push({ id, updates: constrainedUpdates })
+          })
+          
+          // Apply all updates at once
+          if (updates.length > 0) {
+            updateMultipleShapes(updates)
+          }
+        }
+      }
     }
     
     const handleKeyUp = (e: KeyboardEvent) => {

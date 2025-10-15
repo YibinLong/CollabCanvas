@@ -340,67 +340,86 @@ This document outlines the complete implementation plan for the Figma clone proj
 ## Phase 5: Authentication (TDD)
 
 ### PR #20: Authentication Tests
-**Status:** Pending
+**Status:** ✅ COMPLETE
 **TDD Step:** ✍️ WRITE TESTS FIRST
 
 **Tasks:**
-- Write test: User can signup with email/password
-- Write test: User can login
-- Write test: User can logout
-- Write test: Protected routes require auth
+- ✅ Write test: User can signup with email/password
+- ✅ Write test: User can login
+- ✅ Write test: User can logout
+- ✅ Write test: Protected routes require auth
 
 **Why:** (TDD) Write failing tests for core auth flow.
+
+**Results:** 33 tests passing (13 frontend + 10 backend + 10 integration)
 
 ---
 
 ### PR #21: Supabase Authentication Implementation
-**Status:** Pending
+**Status:** ✅ COMPLETE
 **TDD Step:** ✅ MAKE TESTS PASS
 
 **Tasks:**
-- Create Supabase project and configure Auth
-- Install Supabase client libraries (frontend and backend)
-- Create authentication context provider on frontend
-- Implement signup page/component with email/password
-- Implement login page/component
-- Implement logout functionality
-- Add protected route middleware
-- Create auth helper functions for JWT validation
-- Set up session persistence
-- **Run tests from PR #20 - all should pass**
+- ✅ Create Supabase project and configure Auth
+- ✅ Install Supabase client libraries (frontend and backend)
+- ✅ Create authentication context provider on frontend
+- ✅ Implement signup page/component with email/password
+- ✅ Implement login page/component
+- ✅ Implement logout functionality
+- ✅ Add protected route middleware
+- ✅ Create auth helper functions for JWT validation
+- ✅ Set up session persistence
+- ✅ **Run tests from PR #20 - all tests pass!**
 
 **Why:** (TDD) Implement authentication to pass all tests from PR #20.
+
+**Files Created:**
+- `frontend/lib/AuthContext.tsx` - Auth context provider
+- `frontend/lib/supabase.ts` - Supabase client
+- `frontend/app/login/page.tsx` - Login page
+- `frontend/app/signup/page.tsx` - Signup page
+- `backend/src/controllers/authController.ts` - Auth controller
+- `backend/src/routes/authRoutes.ts` - Auth routes
+- `backend/src/middleware/auth.ts` - JWT middleware
 
 ---
 
 ### PR #22: Auth Integration Tests
-**Status:** Pending
+**Status:** ✅ COMPLETE
 **TDD Step:** ✍️ WRITE TESTS FIRST
 
 **Tasks:**
-- Write test: API routes require authentication
-- Write test: Documents are owned by creator
-- Write test: User identity shows in presence
+- ✅ Write test: API routes require authentication
+- ✅ Write test: Documents are owned by creator
+- ✅ Write test: User identity shows in presence
 
 **Why:** (TDD) Write failing tests for auth integration with app features.
+
+**Results:** 10 integration tests passing
 
 ---
 
 ### PR #23: Auth Integration Implementation
-**Status:** Pending
+**Status:** ✅ COMPLETE
 **TDD Step:** ✅ MAKE TESTS PASS
 
 **Tasks:**
-- Add JWT authentication to WebSocket connections
-- Protect all backend API routes with auth middleware
-- Link document ownership to authenticated users
-- Implement document sharing permissions (owner only for MVP)
-- Add user profile in UI header
-- Link presence awareness to authenticated user identity (name, email)
-- Handle auth token refresh
-- **Run tests from PR #22 - all should pass**
+- ✅ Add JWT authentication to WebSocket connections
+- ✅ Protect all backend API routes with auth middleware
+- ✅ Link document ownership to authenticated users
+- ✅ Implement document sharing permissions (owner only for MVP)
+- ✅ Add user profile in UI header
+- ✅ Link presence awareness to authenticated user identity (name, email)
+- ✅ Handle auth token refresh
+- ✅ **Run tests from PR #22 - all tests pass!**
 
 **Why:** (TDD) Integrate authentication throughout the app to pass all tests from PR #22.
+
+**Features Implemented:**
+- Protected routes redirect to login
+- All API endpoints require JWT authentication
+- User identity displayed in presence system
+- Document ownership enforced
 
 ---
 
@@ -844,16 +863,16 @@ alignShapesLeft: () => {
 - **Estimated Timeline:** 11-15 weeks (due to proper TDD implementation + polish features)
 - **TDD Impact:** Tests are now written BEFORE implementation for every feature
 - **Key Milestones:**
-  - Phase 1 complete: Foundation & testing setup (PRs #1-3)
-  - Phase 2 complete: Basic canvas functionality with tests (PRs #4-9)
-  - Phase 3 complete: Real-time collaboration working with tests (PRs #10-15)
-  - Phase 4 complete: Backend & persistence with tests (PRs #16-19)
-  - Phase 5 complete: Authentication with tests (PRs #20-23)
-  - **Phase 6 complete: Advanced canvas features for better scoring (PRs #24-28)** ⭐ NEW!
-  - Phase 7 complete: AI assistant functional with tests (PRs #29-34)
-  - Phase 8 complete: Performance & security hardened (PRs #35-37)
-  - Phase 9 complete: Production deployment (PRs #38-42)
-  - Phase 10 complete: v1.0.0 release (PRs #43-44)
+  - ✅ Phase 1 complete: Foundation & testing setup (PRs #1-3)
+  - ✅ Phase 2 complete: Basic canvas functionality with tests (PRs #4-9)
+  - ✅ Phase 3 complete: Real-time collaboration working with tests (PRs #10-15)
+  - ✅ Phase 4 complete: Backend & persistence with tests (PRs #16-19)
+  - ✅ **Phase 5 complete: Authentication with tests (PRs #20-23)** 🔐 JUST COMPLETED!
+  - ⏳ Phase 6 pending: Advanced canvas features for better scoring (PRs #24-28) ⭐ NEXT!
+  - Phase 7 pending: AI assistant functional with tests (PRs #29-34)
+  - Phase 8 pending: Performance & security hardened (PRs #35-37)
+  - Phase 9 pending: Production deployment (PRs #38-42)
+  - Phase 10 pending: v1.0.0 release (PRs #43-44)
 
 ## Notes
 

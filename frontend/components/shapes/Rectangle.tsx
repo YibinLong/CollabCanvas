@@ -17,6 +17,7 @@ interface RectangleProps {
   isSelected?: boolean
   onClick?: (e: React.MouseEvent) => void
   onMouseDown?: (e: React.MouseEvent) => void
+  onContextMenu?: (e: React.MouseEvent) => void
 }
 
 /**
@@ -25,8 +26,9 @@ interface RectangleProps {
  * @param shape - The rectangle shape data (position, size, color)
  * @param isSelected - Whether this shape is currently selected
  * @param onClick - Handler for when user clicks this shape
+ * @param onContextMenu - Handler for when user right-clicks this shape
  */
-export default function Rectangle({ shape, isSelected, onClick, onMouseDown }: RectangleProps) {
+export default function Rectangle({ shape, isSelected, onClick, onMouseDown, onContextMenu }: RectangleProps) {
   return (
     <rect
       // Position and size
@@ -53,6 +55,7 @@ export default function Rectangle({ shape, isSelected, onClick, onMouseDown }: R
       // Event handlers
       onClick={onClick}
       onMouseDown={onMouseDown}
+      onContextMenu={onContextMenu}
       
       // Style cursor to indicate clickability
       style={{ cursor: 'pointer' }}

@@ -23,6 +23,7 @@ interface TextProps {
   isSelected?: boolean
   onClick?: (e: React.MouseEvent) => void
   onMouseDown?: (e: React.MouseEvent) => void
+  onContextMenu?: (e: React.MouseEvent) => void
   onTextChange?: (newText: string) => void
 }
 
@@ -32,9 +33,10 @@ interface TextProps {
  * @param shape - The text shape data (position, text content, fontSize, color)
  * @param isSelected - Whether this shape is currently selected
  * @param onClick - Handler for when user clicks this shape
+ * @param onContextMenu - Handler for when user right-clicks this shape
  * @param onTextChange - Handler for when text content is edited
  */
-export default function Text({ shape, isSelected, onClick, onMouseDown, onTextChange }: TextProps) {
+export default function Text({ shape, isSelected, onClick, onMouseDown, onContextMenu, onTextChange }: TextProps) {
   // Track if we're currently editing this text
   const [isEditing, setIsEditing] = useState(false)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
@@ -148,6 +150,7 @@ export default function Text({ shape, isSelected, onClick, onMouseDown, onTextCh
         strokeDasharray={isSelected ? 'none' : '5,5'}
         onClick={onClick}
         onMouseDown={onMouseDown}
+        onContextMenu={onContextMenu}
         style={{ cursor: 'pointer' }}
       />
       

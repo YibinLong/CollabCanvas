@@ -57,6 +57,8 @@ interface CanvasStore {
   setCurrentTool: (tool: Tool) => void
   
   bringToFront: (id: string) => void
+  bringForward: (id: string) => void
+  sendBackward: (id: string) => void
   sendToBack: (id: string) => void
   deleteSelected: () => void
   
@@ -428,6 +430,81 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
       // Set this shape's zIndex to max + 1
       const newShapes = new Map(state.shapes)
       newShapes.set(id, { ...shape, zIndex: maxZIndex + 1 })
+      
+      return { shapes: newShapes }
+    })
+  },
+  
+  /**
+   * Bring a shape forward one layer
+   * 
+   * WHY: Provides fine-grained control over layering.
+   * Instead of jumping to the very front, move up just one position.
+   * 
+   * HOW: Find the next higher zIndex and move just above it.
+   * This is more precise than bringToFront for complex layouts.
+   */
+  bringForward: (id: string) => {
+    set((state) => {
+      const shape = state.shapes.get(id)
+      if (!shape) return state
+      
+      const currentZIndex = shape.zIndex || 0
+      
+      // Find all shapes with higher zIndex, sorted ascending
+      const allShapes = Array.from(state.shapes.values())
+      const higherShapes = allShapes
+        .filter(s => (s.zIndex || 0) > currentZIndex)
+        .sort((a, b) => (a.zIndex || 0) - (b.zIndex || 0))
+      
+      if (higherShapes.length === 0) {
+        // Already at the top, no change needed
+        return state
+      }
+      
+      // Move to just above the next shape
+      const nextZIndex = higherShapes[0].zIndex || 0
+      const newZIndex = nextZIndex + 1
+      
+      const newShapes = new Map(state.shapes)
+      newShapes.set(id, { ...shape, zIndex: newZIndex })
+      
+      return { shapes: newShapes }
+    })
+  },
+  
+  /**
+   * Send a shape backward one layer
+   * 
+   * WHY: Provides fine-grained control over layering.
+   * Instead of jumping to the very back, move down just one position.
+   * 
+   * HOW: Find the next lower zIndex and move just below it.
+   */
+  sendBackward: (id: string) => {
+    set((state) => {
+      const shape = state.shapes.get(id)
+      if (!shape) return state
+      
+      const currentZIndex = shape.zIndex || 0
+      
+      // Find all shapes with lower zIndex, sorted descending
+      const allShapes = Array.from(state.shapes.values())
+      const lowerShapes = allShapes
+        .filter(s => (s.zIndex || 0) < currentZIndex)
+        .sort((a, b) => (b.zIndex || 0) - (a.zIndex || 0))
+      
+      if (lowerShapes.length === 0) {
+        // Already at the bottom, no change needed
+        return state
+      }
+      
+      // Move to just below the next shape
+      const nextZIndex = lowerShapes[0].zIndex || 0
+      const newZIndex = nextZIndex - 1
+      
+      const newShapes = new Map(state.shapes)
+      newShapes.set(id, { ...shape, zIndex: newZIndex })
       
       return { shapes: newShapes }
     })

@@ -22,6 +22,7 @@ interface CircleProps {
   isSelected?: boolean
   onClick?: (e: React.MouseEvent) => void
   onMouseDown?: (e: React.MouseEvent) => void
+  onContextMenu?: (e: React.MouseEvent) => void
 }
 
 /**
@@ -31,12 +32,13 @@ interface CircleProps {
  * @param isSelected - Whether this shape is currently selected
  * @param onClick - Handler for when user clicks this shape
  * @param onMouseDown - Handler for when user presses mouse down on this shape
+ * @param onContextMenu - Handler for when user right-clicks this shape
  * 
  * WHY BOUNDING BOX: By treating circles like rectangles with a bounding box,
  * we get consistent boundary checking and the circle can never go out of bounds.
  * This is the same approach used by Figma, Sketch, and Adobe XD.
  */
-export default function Circle({ shape, isSelected, onClick, onMouseDown }: CircleProps) {
+export default function Circle({ shape, isSelected, onClick, onMouseDown, onContextMenu }: CircleProps) {
   // Calculate the center of the bounding box - this is where the circle center will be
   const centerX = shape.x + shape.width / 2
   const centerY = shape.y + shape.height / 2
@@ -87,6 +89,7 @@ export default function Circle({ shape, isSelected, onClick, onMouseDown }: Circ
         // Event handlers
         onClick={onClick}
         onMouseDown={onMouseDown}
+        onContextMenu={onContextMenu}
         
         // Style cursor
         style={{ cursor: 'pointer' }}

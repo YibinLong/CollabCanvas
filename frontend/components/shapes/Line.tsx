@@ -15,6 +15,7 @@ interface LineProps {
   isSelected?: boolean
   onClick?: (e: React.MouseEvent) => void
   onMouseDown?: (e: React.MouseEvent) => void
+  onContextMenu?: (e: React.MouseEvent) => void
 }
 
 /**
@@ -23,8 +24,9 @@ interface LineProps {
  * @param shape - The line shape data (start point, end point, color)
  * @param isSelected - Whether this shape is currently selected
  * @param onClick - Handler for when user clicks this shape
+ * @param onContextMenu - Handler for when user right-clicks this shape
  */
-export default function Line({ shape, isSelected, onClick, onMouseDown }: LineProps) {
+export default function Line({ shape, isSelected, onClick, onMouseDown, onContextMenu }: LineProps) {
   return (
     <line
       // Start and end points
@@ -48,6 +50,7 @@ export default function Line({ shape, isSelected, onClick, onMouseDown }: LinePr
       // Event handlers
       onClick={onClick}
       onMouseDown={onMouseDown}
+      onContextMenu={onContextMenu}
       
       // Style cursor
       style={{ cursor: 'pointer' }}

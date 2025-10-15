@@ -33,6 +33,7 @@ import ResizeHandles, { type HandlePosition } from './ResizeHandles'
 import CursorOverlay from './CursorOverlay'
 import AlignmentToolbar from './AlignmentToolbar'
 import PropertiesPanel from './PropertiesPanel'
+import ContextMenu from './ContextMenu'
 import type { Shape } from '@/types/canvas'
 
 // Interaction modes
@@ -183,6 +184,8 @@ export default function Canvas({ provider, users, updateCursor, currentUser }: C
     lockShape,
     unlockShape,
     isShapeLocked,
+    bringToFront,
+    sendToBack,
   } = useCanvasStore()
   
   /**
@@ -201,6 +204,15 @@ export default function Canvas({ provider, users, updateCursor, currentUser }: C
   
   // Track if mouse is currently over the canvas
   const [isMouseOverCanvas, setIsMouseOverCanvas] = useState(false)
+  
+  // Context menu state
+  // WHY: Track whether the context menu is open, its position, and which shape it's for
+  const [contextMenu, setContextMenu] = useState<{
+    isOpen: boolean
+    x: number
+    y: number
+    shapeId: string
+  } | null>(null)
   
   // Refs for DOM and interaction state
   const svgRef = useRef<SVGSVGElement>(null)
@@ -813,6 +825,33 @@ export default function Canvas({ provider, users, updateCursor, currentUser }: C
   }
   
   /**
+   * Handle right-click on shape - show context menu
+   * 
+   * WHY: Right-click should open a context menu with actions like z-index management.
+   * This is standard behavior in design tools (Figma, Adobe, etc.)
+   * 
+   * HOW: Prevent default browser context menu, store mouse position and shape ID,
+   * and show our custom context menu component.
+   */
+  const handleShapeContextMenu = (shape: Shape, e: React.MouseEvent) => {
+    e.preventDefault() // Prevent browser's default context menu
+    e.stopPropagation()
+    
+    // Select the shape if not already selected
+    if (!selectedIds.includes(shape.id)) {
+      selectShape(shape.id)
+    }
+    
+    // Show context menu at mouse position (screen coordinates)
+    setContextMenu({
+      isOpen: true,
+      x: e.clientX,
+      y: e.clientY,
+      shapeId: shape.id,
+    })
+  }
+  
+  /**
    * Handle shape click - select or start moving
    * 
    * WHY: Clicking shapes should select them. Shift+click adds to selection.
@@ -1099,6 +1138,26 @@ export default function Canvas({ provider, users, updateCursor, currentUser }: C
         }
       }
       
+      // Z-index shortcuts: Shift+] = Bring to Front, Shift+[ = Send to Back
+      if (!isTyping && e.shiftKey) {
+        const currentState = useCanvasStore.getState()
+        const currentSelectedIds = currentState.selectedIds
+        
+        if (currentSelectedIds.length > 0) {
+          if (e.key === '}' || e.key === ']') {
+            e.preventDefault()
+            currentSelectedIds.forEach(id => bringToFront(id))
+            return
+          }
+          
+          if (e.key === '{' || e.key === '[') {
+            e.preventDefault()
+            currentSelectedIds.forEach(id => sendToBack(id))
+            return
+          }
+        }
+      }
+      
       // Arrow keys to move selected shapes
       // WHY: Arrow keys are essential for precise positioning in design tools (Figma-like)
       // Users can nudge shapes by 20px (normal) or 100px (with Shift) for fine control
@@ -1181,11 +1240,10 @@ export default function Canvas({ provider, users, updateCursor, currentUser }: C
       document.removeEventListener('keyup', handleKeyUp)
       window.removeEventListener('blur', handleWindowBlur)
     }
-    // WHY: Removed 'shapes' from dependencies to prevent event listener thrashing
-    // The shapes Map changes frequently, which was causing the event listeners to be
-    // removed and re-added constantly. This could cause the first Escape press to be lost.
-    // Now we use useCanvasStore.getState().shapes directly inside the handler instead.
-  }, [isSpacePressed, deleteSelected, interactionMode, removeShape, clearSelection])
+    // WHY: Removed 'shapes' and 'selectedIds' from dependencies to prevent event listener thrashing
+    // These change frequently, which would cause the event listeners to be removed and re-added constantly.
+    // Now we use useCanvasStore.getState() directly inside the handler to get current values.
+  }, [isSpacePressed, deleteSelected, interactionMode, removeShape, clearSelection, bringToFront, sendToBack])
   
   /**
    * Automatic lock timeout mechanism
@@ -1328,15 +1386,20 @@ export default function Canvas({ provider, users, updateCursor, currentUser }: C
     // Add a wrapper with cursor styling for locked shapes
     const wrapperStyle = isLockedByOther ? { cursor: 'not-allowed' } : {}
     
+    // Right-click handler for context menu
+    const handleContextMenu = (e: React.MouseEvent) => {
+      handleShapeContextMenu(shape, e)
+    }
+    
     switch (shape.type) {
       case 'rect':
-        shapeElement = <Rectangle key={shape.id} shape={shape} isSelected={isSelected} onClick={handleClick} onMouseDown={handleShapeMouseDown} />
+        shapeElement = <Rectangle key={shape.id} shape={shape} isSelected={isSelected} onClick={handleClick} onMouseDown={handleShapeMouseDown} onContextMenu={handleContextMenu} />
         break
       case 'circle':
-        shapeElement = <Circle key={shape.id} shape={shape} isSelected={isSelected} onClick={handleClick} onMouseDown={handleShapeMouseDown} />
+        shapeElement = <Circle key={shape.id} shape={shape} isSelected={isSelected} onClick={handleClick} onMouseDown={handleShapeMouseDown} onContextMenu={handleContextMenu} />
         break
       case 'line':
-        shapeElement = <Line key={shape.id} shape={shape} isSelected={isSelected} onClick={handleClick} onMouseDown={handleShapeMouseDown} />
+        shapeElement = <Line key={shape.id} shape={shape} isSelected={isSelected} onClick={handleClick} onMouseDown={handleShapeMouseDown} onContextMenu={handleContextMenu} />
         break
       case 'text':
         shapeElement = (
@@ -1346,6 +1409,7 @@ export default function Canvas({ provider, users, updateCursor, currentUser }: C
             isSelected={isSelected} 
             onClick={handleClick} 
             onMouseDown={handleShapeMouseDown}
+            onContextMenu={handleContextMenu}
             onTextChange={(newText) => {
               // Update the text content when user edits it
               updateShape(shape.id, { text: newText })
@@ -1620,6 +1684,16 @@ export default function Canvas({ provider, users, updateCursor, currentUser }: C
       
       {/* Properties panel (color picker) - shows when shapes selected */}
       <PropertiesPanel />
+      
+      {/* Context menu - shows on right-click */}
+      {contextMenu && contextMenu.isOpen && (
+        <ContextMenu
+          x={contextMenu.x}
+          y={contextMenu.y}
+          shapeId={contextMenu.shapeId}
+          onClose={() => setContextMenu(null)}
+        />
+      )}
     </div>
   )
 }

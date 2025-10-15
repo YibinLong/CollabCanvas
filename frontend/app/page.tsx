@@ -200,6 +200,11 @@ export default function Home() {
           <div><kbd className="bg-gray-700 px-1 rounded">Delete</kbd> = Delete selected</div>
           <div><kbd className="bg-gray-700 px-1 rounded">Arrow Keys</kbd> = Move selected shape</div>
           <div><kbd className="bg-gray-700 px-1 rounded">Shift</kbd> + <kbd className="bg-gray-700 px-1 rounded">Arrow</kbd> = Move faster (5x)</div>
+          <div><kbd className="bg-gray-700 px-1 rounded">Cmd/Ctrl</kbd> + <kbd className="bg-gray-700 px-1 rounded">D</kbd> = Duplicate selected</div>
+          <div><kbd className="bg-gray-700 px-1 rounded">Cmd/Ctrl</kbd> + <kbd className="bg-gray-700 px-1 rounded">C</kbd> = Copy selected</div>
+          <div><kbd className="bg-gray-700 px-1 rounded">Cmd/Ctrl</kbd> + <kbd className="bg-gray-700 px-1 rounded">V</kbd> = Paste from clipboard</div>
+          <div>Color Picker = Select shape(s) to see properties panel</div>
+          <div>Alignment Tools = Select 2+ shapes to see alignment toolbar</div>
         </div>
       </div>
     </main>

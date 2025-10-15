@@ -12,6 +12,7 @@
  * - Renders only when shapes are selected
  * - Updates all selected shapes when color changes
  * - Uses native HTML5 color input for simplicity
+ * - Has z-20 to appear above header (z-10) and toolbar (z-10)
  */
 
 'use client'
@@ -63,7 +64,12 @@ export default function PropertiesPanel() {
   }
   
   return (
-    <div className="absolute top-4 right-4 bg-white rounded-lg shadow-lg p-4 min-w-[240px]">
+    <div className="absolute top-20 right-4 bg-white rounded-lg shadow-lg p-4 min-w-[240px] z-20">
+      {/* 
+        WHY top-20: Positioned below the header bar (which ends around top-16)
+        WHY z-20: This panel must appear above the header bar (z-10) and toolbar (z-10)
+        so it doesn't get clipped or covered.
+      */}
       {/* Panel Header */}
       <h3 className="text-sm font-semibold text-gray-700 mb-3">
         {selectedIds.length === 1 ? 'Properties' : `${selectedIds.length} shapes selected`}

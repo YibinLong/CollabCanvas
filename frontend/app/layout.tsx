@@ -2,6 +2,7 @@ import './globals.css';
 import type { Metadata } from 'next';
 import { Inter } from 'next/font/google';
 import { AuthProvider } from '@/lib/AuthContext';
+import BackendWarmup from '@/components/BackendWarmup';
 
 // Load Inter font from Google Fonts for modern, clean typography
 const inter = Inter({ subsets: ['latin'] });
@@ -19,6 +20,7 @@ export const metadata: Metadata = {
  * - Global styles (Tailwind CSS)
  * - Fonts
  * - AuthProvider: Makes authentication available to all pages/components
+ * - BackendWarmup: Wakes up the backend on Render (free tier) immediately when page loads
  * 
  * WHAT: The {children} prop will be replaced with each page's content
  */
@@ -30,6 +32,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={inter.className}>
+        <BackendWarmup />
         <AuthProvider>{children}</AuthProvider>
       </body>
     </html>

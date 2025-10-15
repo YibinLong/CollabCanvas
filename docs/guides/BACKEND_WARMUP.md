@@ -19,6 +19,8 @@ Free-tier hosting services like Render spin down your backend after 15 minutes o
 ### Files Changed
 - `frontend/components/BackendWarmup.tsx` - New component that pings the backend
 - `frontend/app/layout.tsx` - Added BackendWarmup to root layout (runs on all pages)
+- `frontend/app/login/page.tsx` - Added "waking up server" indicator when login takes >5 seconds
+- `frontend/app/signup/page.tsx` - Added "waking up server" indicator when signup takes >5 seconds
 
 ### How it works technically
 
@@ -76,6 +78,24 @@ NEXT_PUBLIC_BACKEND_URL=https://your-app-name.onrender.com
 4. Check Network tab in DevTools - you'll see the `/health` request fire immediately
 5. Try logging in shortly after - it should be much faster than before!
 
+## Slow Load Indicator
+
+In addition to the warmup ping, we've added a friendly "waking up" message on login/signup pages:
+
+### How it works:
+1. User clicks "Login" or "Sign Up"
+2. After **5 seconds** of loading, a blue notification appears:
+   - ☕ Cute spinning animation
+   - Friendly message: "Waking up the server..."
+   - Explanation: "First login may take up to a minute. Thanks for your patience! 🚀"
+3. Once backend responds, the notification disappears
+
+### Key Features:
+- **Only shows if no error** - Won't interfere with actual error messages (wrong password, etc.)
+- **Appears after 5 seconds** - Gives backend time to respond normally first
+- **Friendly & cute** - Makes the wait feel less frustrating
+- **Informative** - Users understand WHY it's taking time (not a bug!)
+
 ## Benefits
 
 ✅ **Better User Experience** - No more 50-second waits when logging in
@@ -83,6 +103,7 @@ NEXT_PUBLIC_BACKEND_URL=https://your-app-name.onrender.com
 ✅ **Simple** - Just one small component, no complex configuration
 ✅ **Safe** - Fails silently if backend is unreachable
 ✅ **Efficient** - Only one ping per page load, not continuous polling
+✅ **Friendly Feedback** - Users see a cute loading message if backend is still waking up
 
 ## Tradeoffs
 

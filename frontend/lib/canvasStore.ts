@@ -65,6 +65,14 @@ interface CanvasStore {
   unlockShape: (id: string) => void
   isShapeLocked: (id: string, currentUserId: string) => boolean
   releaseAllLocks: (userId: string) => void
+  
+  // Alignment actions
+  alignLeft: () => void
+  alignRight: () => void
+  alignTop: () => void
+  alignBottom: () => void
+  distributeHorizontally: () => void
+  distributeVertically: () => void
 }
 
 /**
@@ -585,6 +593,265 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
       })
       
       return hasChanges ? { shapes: newShapes } : state
+    })
+  },
+  
+  /**
+   * Align all selected shapes to the left (leftmost x)
+   * 
+   * WHY: Alignment is essential in design tools (Figma-like).
+   * Helps users create precise layouts.
+   * 
+   * HOW: Find the leftmost x among selected shapes, then move
+   * all selected shapes to that x position.
+   */
+  alignLeft: () => {
+    set((state) => {
+      if (state.selectedIds.length < 2) return state
+      
+      // Find leftmost x
+      const selectedShapes = state.selectedIds
+        .map(id => state.shapes.get(id))
+        .filter(Boolean) as Shape[]
+      
+      if (selectedShapes.length === 0) return state
+      
+      const minX = Math.min(...selectedShapes.map(s => s.x))
+      
+      // Update all selected shapes to this x
+      const updates = state.selectedIds.map(id => ({
+        id,
+        updates: { x: minX }
+      }))
+      
+      const newShapes = new Map(state.shapes)
+      updates.forEach(({ id, updates: shapeUpdates }) => {
+        const shape = newShapes.get(id)
+        if (shape) {
+          newShapes.set(id, { ...shape, ...shapeUpdates } as Shape)
+        }
+      })
+      
+      return { shapes: newShapes }
+    })
+  },
+  
+  /**
+   * Align all selected shapes to the right (rightmost right edge)
+   * 
+   * WHY: Align right lines up the right edges of shapes.
+   * 
+   * HOW: Find the rightmost right edge (x + width), then adjust
+   * each shape's x so its right edge aligns there.
+   */
+  alignRight: () => {
+    set((state) => {
+      if (state.selectedIds.length < 2) return state
+      
+      const selectedShapes = state.selectedIds
+        .map(id => state.shapes.get(id))
+        .filter(Boolean) as Shape[]
+      
+      if (selectedShapes.length === 0) return state
+      
+      // Find rightmost right edge
+      const maxRight = Math.max(...selectedShapes.map(s => {
+        if (s.type === 'rect' || s.type === 'circle' || s.type === 'text') {
+          return s.x + s.width
+        }
+        return s.x // Lines and others just use x
+      }))
+      
+      // Update all selected shapes
+      const newShapes = new Map(state.shapes)
+      state.selectedIds.forEach(id => {
+        const shape = newShapes.get(id)
+        if (shape) {
+          if (shape.type === 'rect' || shape.type === 'circle' || shape.type === 'text') {
+            newShapes.set(id, { ...shape, x: maxRight - shape.width } as Shape)
+          }
+        }
+      })
+      
+      return { shapes: newShapes }
+    })
+  },
+  
+  /**
+   * Align all selected shapes to the top (topmost y)
+   */
+  alignTop: () => {
+    set((state) => {
+      if (state.selectedIds.length < 2) return state
+      
+      const selectedShapes = state.selectedIds
+        .map(id => state.shapes.get(id))
+        .filter(Boolean) as Shape[]
+      
+      if (selectedShapes.length === 0) return state
+      
+      const minY = Math.min(...selectedShapes.map(s => s.y))
+      
+      const newShapes = new Map(state.shapes)
+      state.selectedIds.forEach(id => {
+        const shape = newShapes.get(id)
+        if (shape) {
+          newShapes.set(id, { ...shape, y: minY } as Shape)
+        }
+      })
+      
+      return { shapes: newShapes }
+    })
+  },
+  
+  /**
+   * Align all selected shapes to the bottom (bottommost bottom edge)
+   */
+  alignBottom: () => {
+    set((state) => {
+      if (state.selectedIds.length < 2) return state
+      
+      const selectedShapes = state.selectedIds
+        .map(id => state.shapes.get(id))
+        .filter(Boolean) as Shape[]
+      
+      if (selectedShapes.length === 0) return state
+      
+      // Find bottommost bottom edge
+      const maxBottom = Math.max(...selectedShapes.map(s => {
+        if (s.type === 'rect' || s.type === 'circle' || s.type === 'text') {
+          return s.y + s.height
+        }
+        return s.y
+      }))
+      
+      // Update all selected shapes
+      const newShapes = new Map(state.shapes)
+      state.selectedIds.forEach(id => {
+        const shape = newShapes.get(id)
+        if (shape) {
+          if (shape.type === 'rect' || shape.type === 'circle' || shape.type === 'text') {
+            newShapes.set(id, { ...shape, y: maxBottom - shape.height } as Shape)
+          }
+        }
+      })
+      
+      return { shapes: newShapes }
+    })
+  },
+  
+  /**
+   * Distribute shapes evenly horizontally
+   * 
+   * WHY: Creates equal spacing between shapes on the x-axis.
+   * 
+   * HOW: Sort shapes by x, keep first and last in place,
+   * distribute middle shapes evenly in between.
+   */
+  distributeHorizontally: () => {
+    set((state) => {
+      if (state.selectedIds.length < 3) return state // Need at least 3 shapes
+      
+      const selectedShapes = state.selectedIds
+        .map(id => ({ id, shape: state.shapes.get(id) }))
+        .filter(({ shape }) => shape !== undefined) as Array<{ id: string; shape: Shape }>
+      
+      if (selectedShapes.length < 3) return state
+      
+      // Sort by x position
+      selectedShapes.sort((a, b) => a.shape.x - b.shape.x)
+      
+      const first = selectedShapes[0]
+      const last = selectedShapes[selectedShapes.length - 1]
+      
+      // Calculate total span
+      const firstRight = first.shape.type === 'rect' || first.shape.type === 'circle' || first.shape.type === 'text'
+        ? first.shape.x + first.shape.width
+        : first.shape.x
+      
+      const totalSpan = last.shape.x - firstRight
+      
+      // Calculate total width of middle shapes
+      const middleShapes = selectedShapes.slice(1, -1)
+      const totalMiddleWidth = middleShapes.reduce((sum, { shape }) => {
+        if (shape.type === 'rect' || shape.type === 'circle' || shape.type === 'text') {
+          return sum + shape.width
+        }
+        return sum
+      }, 0)
+      
+      // Calculate gap
+      const gap = (totalSpan - totalMiddleWidth) / (selectedShapes.length - 1)
+      
+      // Update middle shapes
+      const newShapes = new Map(state.shapes)
+      let currentX = firstRight + gap
+      
+      middleShapes.forEach(({ id, shape }) => {
+        newShapes.set(id, { ...shape, x: currentX } as Shape)
+        if (shape.type === 'rect' || shape.type === 'circle' || shape.type === 'text') {
+          currentX += shape.width + gap
+        } else {
+          currentX += gap
+        }
+      })
+      
+      return { shapes: newShapes }
+    })
+  },
+  
+  /**
+   * Distribute shapes evenly vertically
+   */
+  distributeVertically: () => {
+    set((state) => {
+      if (state.selectedIds.length < 3) return state
+      
+      const selectedShapes = state.selectedIds
+        .map(id => ({ id, shape: state.shapes.get(id) }))
+        .filter(({ shape }) => shape !== undefined) as Array<{ id: string; shape: Shape }>
+      
+      if (selectedShapes.length < 3) return state
+      
+      // Sort by y position
+      selectedShapes.sort((a, b) => a.shape.y - b.shape.y)
+      
+      const first = selectedShapes[0]
+      const last = selectedShapes[selectedShapes.length - 1]
+      
+      // Calculate total span
+      const firstBottom = first.shape.type === 'rect' || first.shape.type === 'circle' || first.shape.type === 'text'
+        ? first.shape.y + first.shape.height
+        : first.shape.y
+      
+      const totalSpan = last.shape.y - firstBottom
+      
+      // Calculate total height of middle shapes
+      const middleShapes = selectedShapes.slice(1, -1)
+      const totalMiddleHeight = middleShapes.reduce((sum, { shape }) => {
+        if (shape.type === 'rect' || shape.type === 'circle' || shape.type === 'text') {
+          return sum + shape.height
+        }
+        return sum
+      }, 0)
+      
+      // Calculate gap
+      const gap = (totalSpan - totalMiddleHeight) / (selectedShapes.length - 1)
+      
+      // Update middle shapes
+      const newShapes = new Map(state.shapes)
+      let currentY = firstBottom + gap
+      
+      middleShapes.forEach(({ id, shape }) => {
+        newShapes.set(id, { ...shape, y: currentY } as Shape)
+        if (shape.type === 'rect' || shape.type === 'circle' || shape.type === 'text') {
+          currentY += shape.height + gap
+        } else {
+          currentY += gap
+        }
+      })
+      
+      return { shapes: newShapes }
     })
   },
 }))

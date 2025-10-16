@@ -21,6 +21,10 @@ import {
   getDocument,
   deleteDocument,
   clearAllShapes,
+  getVersions,
+  restoreVersion,
+  createVersionSnapshot,
+  deleteAllVersions,
 } from '../controllers/documentController';
 import { authenticateJWT } from '../middleware/auth';
 
@@ -69,6 +73,25 @@ router.delete('/:id', deleteDocument);
 // WHY: Allows users to delete all shapes at once from the canvas
 // This updates the database and syncs via Yjs to all connected users
 router.post('/:id/clear', clearAllShapes);
+
+// GET /api/documents/:id/versions - Get version history for a document
+// WHY: Users need to see all available versions to choose which one to restore
+// Returns an array of version metadata (id, label, createdAt)
+router.get('/:id/versions', getVersions);
+
+// POST /api/documents/:id/versions/:versionId/restore - Restore a previous version
+// WHY: Users need to be able to roll back to a previous state
+// Loads the specified version and updates the document to match it
+router.post('/:id/versions/:versionId/restore', restoreVersion);
+
+// POST /api/documents/:id/versions - Manually create a version snapshot
+// WHY: Users may want to save snapshots at important milestones
+// Body: { label?: string } - Optional description for the snapshot
+router.post('/:id/versions', createVersionSnapshot);
+
+// DELETE /api/documents/:id/versions - Delete all version history for a document
+// WHY: Allows teams to clear history for cleanup or privacy reasons
+router.delete('/:id/versions', deleteAllVersions);
 
 /**
  * Export router as default

@@ -17,6 +17,8 @@
 import { Request, Response } from 'express';
 import { PrismaClient } from '@prisma/client';
 import { prisma } from '../utils/prisma';
+import { getVersionHistory, loadVersion, saveVersion } from '../services/yjsPersistence';
+import * as Y from 'yjs';
 
 /**
  * List all documents for the authenticated user
@@ -238,6 +240,364 @@ export async function clearAllShapes(req: Request, res: Response) {
   } catch (error) {
     console.error('Error clearing all shapes:', error);
     res.status(500).json({ error: 'Failed to clear shapes' });
+  }
+}
+
+/**
+ * Get Version History for a Document
+ * 
+ * WHY: Users need to see a list of all available versions to choose which one to restore.
+ * 
+ * WHAT: Returns metadata about all saved versions (id, label, timestamp) but NOT
+ * the full Yjs state (that would be too heavy for a list view).
+ * 
+ * HOW: Call the persistence service's getVersionHistory function, which queries
+ * the DocumentVersion table and returns only the metadata fields.
+ * 
+ * AUTHORIZATION: ANY authenticated user can view version history.
+ * This allows collaborative editing without restrictions.
+ */
+export async function getVersions(req: Request, res: Response) {
+  try {
+    const userId = (req as any).userId;
+    const { id } = req.params;
+
+    if (!userId) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    // Find document to verify it exists
+    const document = await prisma.document.findUnique({
+      where: { id },
+      select: { id: true },
+    });
+
+    if (!document) {
+      return res.status(404).json({ error: 'Document not found' });
+    }
+
+    // NO OWNERSHIP CHECK - any authenticated user can view versions
+    // This allows collaborative teams to see and restore versions
+
+    // Get version history from persistence service
+    const versions = await getVersionHistory(id);
+
+    res.json({ versions });
+  } catch (error) {
+    console.error('Error getting version history:', error);
+    res.status(500).json({ error: 'Failed to get version history' });
+  }
+}
+
+/**
+ * Restore a Previous Version
+ * 
+ * WHY: Users need to be able to restore their document to a previous state.
+ * This is useful for undoing major changes or recovering from mistakes.
+ * 
+ * WHAT: Loads the specified version's Yjs state and applies it to the current
+ * document, effectively "rolling back" to that point in time.
+ * 
+ * HOW:
+ * 1. Load the version from DocumentVersion table
+ * 2. Update the main Document's yjsState with the version's state
+ * 3. Create a new version snapshot labeled "Restored from [date]"
+ * 4. Return success
+ * 
+ * SYNC: The Yjs WebSocket will detect the state change and broadcast it to
+ * all connected users, so everyone sees the restored version in real-time.
+ * 
+ * AUTHORIZATION: ANY authenticated user can restore versions.
+ * This allows collaborative teams to restore without restrictions.
+ */
+export async function restoreVersion(req: Request, res: Response) {
+  try {
+    const userId = (req as any).userId;
+    const { id, versionId } = req.params;
+
+    if (!userId) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    console.log(`[VERSION RESTORE] Starting restore for document ${id}, version ${versionId}`);
+
+    // Find document to verify it exists
+    const document = await prisma.document.findUnique({
+      where: { id },
+      select: { id: true, yjsState: true },
+    });
+
+    if (!document) {
+      return res.status(404).json({ error: 'Document not found' });
+    }
+
+    console.log(`[VERSION RESTORE] Current document yjsState size: ${document.yjsState?.length || 0} bytes`);
+
+    // NO OWNERSHIP CHECK - any authenticated user can restore versions
+    // This allows collaborative editing without restrictions
+
+    // Ensure the version belongs to this document and load its data
+    const versionData = await prisma.documentVersion.findFirst({
+      where: {
+        id: versionId,
+        documentId: id,
+      },
+      select: {
+        yjsState: true,
+        createdAt: true,
+        label: true,
+      },
+    });
+
+    if (!versionData) {
+      console.log(`[VERSION RESTORE] ERROR: Version ${versionId} not found for document ${id}`);
+      return res.status(404).json({ error: 'Version not found for this document' });
+    }
+
+    console.log(`[VERSION RESTORE] Found version: "${versionData.label || '(no label)'}", created ${versionData.createdAt}`);
+    console.log(`[VERSION RESTORE] Version yjsState size: ${versionData.yjsState.length} bytes`);
+
+    // Load the version state into a new Yjs document
+    const versionDoc = new Y.Doc();
+    const versionState = new Uint8Array(versionData.yjsState);
+    Y.applyUpdate(versionDoc, versionState);
+
+    // DEBUG: Log shapes in the version we're restoring
+    const versionShapesMap = versionDoc.getMap('shapes');
+    console.log(`[VERSION RESTORE] Shapes in version being restored: ${versionShapesMap.size} shapes`);
+    versionShapesMap.forEach((shape, shapeId) => {
+      const shapeObj = shape as Y.Map<any>;
+      console.log(`[VERSION RESTORE]   - Shape ${shapeId}: type=${shapeObj.get('type')}`);
+    });
+
+    // Serialize it back to bytes for saving on the main document
+    const state = Y.encodeStateAsUpdate(versionDoc);
+    const buffer = Buffer.from(state);
+
+    console.log(`[VERSION RESTORE] Updating document with ${buffer.length} bytes`);
+
+    // Update the document's state to match this version
+    await prisma.document.update({
+      where: { id },
+      data: {
+        yjsState: buffer,
+      },
+    });
+
+    console.log(`[VERSION RESTORE] Document updated in database`);
+
+    // CRITICAL: Update the in-memory Yjs document on the WebSocket server
+    // WHY: If we don't do this, when the user disconnects (during page reload),
+    // the WebSocket will save the OLD in-memory state and overwrite our restore!
+    try {
+      // Import the docs map from y-websocket (with type assertion for no types)
+      // @ts-ignore - y-websocket doesn't have TypeScript definitions
+      const { docs } = await import('y-websocket/bin/utils');
+      const activeDoc = docs.get(id) as Y.Doc | undefined;
+      
+      if (activeDoc) {
+        console.log(`[VERSION RESTORE] Updating in-memory Yjs document`);
+        
+        // Clear the in-memory document and apply the restored state
+        activeDoc.transact(() => {
+          const shapesMap = activeDoc.getMap('shapes');
+          
+          // Clear existing shapes
+          const existingShapes = Array.from(shapesMap.keys());
+          existingShapes.forEach(key => shapesMap.delete(key));
+          
+          // Copy shapes from restored version
+          // IMPORTANT: Can't directly copy Y.Map between documents!
+          // Must create new Y.Map instances and copy properties
+          const restoredShapesMap = versionDoc.getMap('shapes');
+          restoredShapesMap.forEach((shape, shapeId) => {
+            const shapeData = shape as Y.Map<any>;
+            const newShape = new Y.Map();
+            
+            // Copy each property from restored shape to new shape
+            shapeData.forEach((value, key) => {
+              newShape.set(key, value);
+            });
+            
+            shapesMap.set(shapeId, newShape);
+          });
+        });
+        
+        console.log(`[VERSION RESTORE] In-memory document updated - will broadcast to connected clients`);
+      } else {
+        console.log(`[VERSION RESTORE] No active in-memory document (no users connected)`);
+      }
+    } catch (error) {
+      console.error(`[VERSION RESTORE] Failed to update in-memory document:`, error);
+      // Continue anyway - page reload will load from database
+    }
+
+    // Create a new version snapshot marking this restore point
+    // Include version number and label (if it has one)
+    
+    // Get all versions to determine the version number (oldest = #1)
+    const allVersions = await prisma.documentVersion.findMany({
+      where: { documentId: id },
+      orderBy: { createdAt: 'asc' }, // Oldest first
+      select: { id: true, label: true },
+    });
+    
+    // Find the index of the version we're restoring from
+    const versionIndex = allVersions.findIndex(v => v.id === versionId);
+    const versionNumber = versionIndex + 1; // Convert 0-based index to 1-based number
+    
+    // Build the restore label
+    let restoreLabel: string;
+    if (versionData.label && !versionData.label.startsWith('Restored from')) {
+      // Has a custom label (and it's not another "Restored from" label)
+      restoreLabel = `Restored from #${versionNumber} (${versionData.label})`;
+    } else {
+      // No label or it's already a "Restored from" label - just use number and date
+      const date = versionData.createdAt;
+      const shortDate = date.toLocaleString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        hour: 'numeric',
+        minute: '2-digit',
+        hour12: true
+      });
+      restoreLabel = `Restored from #${versionNumber} (${shortDate})`;
+    }
+    
+    await saveVersion(id, versionDoc, restoreLabel);
+
+    console.log(`[VERSION RESTORE] Created restore point: "${restoreLabel}"`);
+
+    res.json({ message: 'Version restored successfully' });
+  } catch (error) {
+    console.error('[VERSION RESTORE] Error:', error);
+    res.status(500).json({ error: 'Failed to restore version' });
+  }
+}
+
+/**
+ * Manually Save a Version Snapshot
+ * 
+ * WHY: Users may want to manually save a snapshot at important milestones
+ * (e.g., "Before redesign", "Final version for review").
+ * 
+ * WHAT: Creates a new version snapshot with an optional user-provided label.
+ * 
+ * HOW:
+ * 1. Load the current document's Yjs state
+ * 2. Call saveVersion() with the optional label
+ * 3. Return success
+ * 
+ * AUTHORIZATION: ANY authenticated user can save versions.
+ * This allows collaborative teams to save snapshots without restrictions.
+ */
+export async function createVersionSnapshot(req: Request, res: Response) {
+  try {
+    const userId = (req as any).userId;
+    const { id } = req.params;
+    const { label, yjsStateBase64 } = req.body;
+
+    if (!userId) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    // Find document to verify it exists
+    const document = await prisma.document.findUnique({
+      where: { id },
+      select: { id: true, yjsState: true },
+    });
+
+    if (!document) {
+      return res.status(404).json({ error: 'Document not found' });
+    }
+
+    // NO OWNERSHIP CHECK - any authenticated user can save versions
+    // This allows collaborative editing without restrictions
+
+    console.log(`[VERSION SAVE] Document ${id}, Label: ${label || '(no label)'}`);
+
+    let ydoc: Y.Doc;
+    
+    // PRIORITY 1: Use state from request body if provided (most up-to-date)
+    if (yjsStateBase64) {
+      console.log(`[VERSION SAVE] Using state from request body`);
+      const stateBuffer = Buffer.from(yjsStateBase64, 'base64');
+      console.log(`[VERSION SAVE] Request yjsState size: ${stateBuffer.length} bytes`);
+      
+      ydoc = new Y.Doc();
+      const state = new Uint8Array(stateBuffer);
+      Y.applyUpdate(ydoc, state);
+    } 
+    // FALLBACK: Use database state (might be stale)
+    else {
+      console.log(`[VERSION SAVE] WARNING: No state in request, using database (might be stale!)`);
+      console.log(`[VERSION SAVE] Database yjsState size: ${document.yjsState?.length || 0} bytes`);
+      
+      ydoc = new Y.Doc();
+      if (document.yjsState && document.yjsState.length > 0) {
+        const state = new Uint8Array(document.yjsState);
+        Y.applyUpdate(ydoc, state);
+      }
+    }
+    
+    // DEBUG: Log shapes in the document
+    const shapesMap = ydoc.getMap('shapes');
+    console.log(`[VERSION SAVE] Shapes in version: ${shapesMap.size} shapes`);
+    shapesMap.forEach((shape, shapeId) => {
+      const shapeObj = shape as Y.Map<any>;
+      console.log(`[VERSION SAVE]   - Shape ${shapeId}: type=${shapeObj.get('type')}`);
+    });
+
+    // Save version with optional label
+    await saveVersion(id, ydoc, label);
+
+    res.status(201).json({ message: 'Version snapshot created successfully' });
+  } catch (error) {
+    console.error('Error creating version snapshot:', error);
+    res.status(500).json({ error: 'Failed to create version snapshot' });
+  }
+}
+
+/**
+ * Delete All Versions for a Document
+ *
+ * WHY: Teams may want to clear the entire version history (cleanup, privacy, etc.).
+ *
+ * WHAT: Removes every DocumentVersion row associated with the document.
+ *
+ * AUTHORIZATION: ANY authenticated user can clear history (matches collaborative model).
+ */
+export async function deleteAllVersions(req: Request, res: Response) {
+  try {
+    const userId = (req as any).userId;
+    const { id } = req.params;
+
+    if (!userId) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    // Ensure document exists so we provide a meaningful error if it doesn't
+    const document = await prisma.document.findUnique({
+      where: { id },
+      select: { id: true },
+    });
+
+    if (!document) {
+      return res.status(404).json({ error: 'Document not found' });
+    }
+
+    // Delete all version rows for this document
+    const result = await prisma.documentVersion.deleteMany({
+      where: { documentId: id },
+    });
+
+    res.json({
+      message: 'Version history cleared successfully',
+      deletedCount: result.count ?? 0,
+    });
+  } catch (error) {
+    console.error('Error deleting version history:', error);
+    res.status(500).json({ error: 'Failed to delete version history' });
   }
 }
 

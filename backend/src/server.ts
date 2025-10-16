@@ -74,7 +74,10 @@ app.use(
 );
 
 // Body parser: Converts JSON request bodies into JavaScript objects
-app.use(express.json());
+// WHY 10MB limit: Version history sends serialized Yjs state in base64.
+// With many shapes, this can exceed the default 100KB limit.
+// 10MB is generous enough for even complex canvases with 1000+ shapes.
+app.use(express.json({ limit: '10mb' }));
 
 // Request logging: Log every incoming request for debugging
 app.use((req: Request, res: Response, next: NextFunction) => {

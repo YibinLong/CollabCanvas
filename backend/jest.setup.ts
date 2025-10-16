@@ -5,11 +5,17 @@
  * mocks, and utilities that all tests can use.
  */
 
+// Load .env file FIRST (for real API keys like OpenAI)
+import dotenv from 'dotenv';
+dotenv.config();
+
 /**
  * Set up test environment variables
  * 
  * These override any .env file values during testing.
  * This ensures tests run in a consistent, isolated environment.
+ * 
+ * NOTE: We don't override OPENAI_API_KEY - we use the real one from .env for AI tests
  */
 process.env.NODE_ENV = 'test'
 process.env.DATABASE_URL = process.env.DATABASE_URL || 'postgresql://test:test@localhost:5432/test'
@@ -17,7 +23,7 @@ process.env.JWT_SECRET = 'test-jwt-secret-key'
 process.env.SUPABASE_URL = 'https://test.supabase.co'
 process.env.SUPABASE_ANON_KEY = 'test-anon-key'
 process.env.SUPABASE_SERVICE_KEY = 'test-service-key'
-process.env.OPENAI_API_KEY = 'test-openai-key'
+// process.env.OPENAI_API_KEY - Use real key from .env (for AI integration tests)
 
 /**
  * Global test timeout

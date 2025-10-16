@@ -15,6 +15,7 @@ import { useRouter } from 'next/navigation'
 import Canvas from '@/components/Canvas'
 import Toolbar from '@/components/Toolbar'
 import UserAvatars from '@/components/UserAvatars'
+import VersionHistory from '@/components/VersionHistory'
 import { useAuth } from '@/lib/AuthContext'
 import { useYjsSync } from '@/lib/useYjsSync'
 import { usePresence } from '@/lib/usePresence'
@@ -30,6 +31,9 @@ export default function Home() {
   
   // State for collapsible controls panel (starts open so new users see it)
   const [controlsOpen, setControlsOpen] = useState(true)
+  
+  // State for version history panel
+  const [versionHistoryOpen, setVersionHistoryOpen] = useState(false)
 
   /**
    * Real-time collaboration setup
@@ -89,6 +93,23 @@ export default function Home() {
     } catch (error) {
       console.error('Logout error:', error)
     }
+  }
+
+  /**
+   * Handle Version Restore
+   * 
+   * WHY: After restoring a version, we need to reload the page to sync with the restored state.
+   * 
+   * EXPLANATION: Yjs keeps the document in memory on both client and server. When we restore
+   * a version, we update the database, but the in-memory Yjs document doesn't automatically
+   * reload from the database. Reloading the page forces a fresh connection that loads the
+   * restored state from the database.
+   */
+  const handleVersionRestore = () => {
+    // Small delay to let the user see the success message
+    setTimeout(() => {
+      window.location.reload()
+    }, 500)
   }
 
   /**
@@ -161,6 +182,18 @@ export default function Home() {
           {/* Figma-style user avatars showing who's present */}
           <UserAvatars users={users} currentUserId={currentUser.id} />
           
+          {/* Version History Button */}
+          <button
+            onClick={() => setVersionHistoryOpen(true)}
+            className="text-white text-sm px-3 py-1 bg-gray-700 hover:bg-gray-600 rounded flex items-center gap-1.5 transition-colors"
+            title="View version history"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            History
+          </button>
+          
           <button
             onClick={handleLogout}
             className="text-white text-sm px-3 py-1 bg-red-600 hover:bg-red-700 rounded"
@@ -231,6 +264,15 @@ export default function Home() {
           </button>
         )}
       </div>
+
+      {/* Version History Panel */}
+      <VersionHistory
+        documentId={documentId}
+        isOpen={versionHistoryOpen}
+        onClose={() => setVersionHistoryOpen(false)}
+        onRestore={handleVersionRestore}
+        yjsDoc={provider?.doc}
+      />
     </main>
   )
 }

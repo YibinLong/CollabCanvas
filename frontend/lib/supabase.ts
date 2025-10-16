@@ -289,3 +289,263 @@ export async function clearAllShapes(documentId: string) {
   }
 }
 
+/**
+ * Helper: Get Version History for a Document
+ * 
+ * WHY: Users need to see a list of all available versions to choose which one to restore.
+ * 
+ * WHAT IT DOES:
+ * 1. Gets the current auth token
+ * 2. Calls backend /api/documents/:id/versions endpoint
+ * 3. Returns an array of version metadata (id, label, createdAt)
+ * 
+ * WHEN TO USE:
+ * - When displaying the version history panel
+ * - To show users all available restore points
+ * 
+ * @param documentId - The document ID to get versions for
+ * @returns Array of version objects with id, label, and createdAt
+ */
+export async function getVersionHistory(documentId: string) {
+  try {
+    const token = await getAuthToken()
+
+    if (!token) {
+      console.error('No auth token available')
+      return { success: false, error: 'Not authenticated', versions: [] }
+    }
+
+    const response = await fetch(
+      `${process.env.NEXT_PUBLIC_API_URL}/api/documents/${documentId}/versions`,
+      {
+        method: 'GET',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      }
+    )
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({ error: 'Unknown error' }))
+      console.error('Failed to get version history:', response.status, errorData)
+      return { 
+        success: false, 
+        error: errorData.error || `Server error: ${response.status}`,
+        versions: []
+      }
+    }
+
+    const data = await response.json()
+    console.log('✅ Version history loaded:', data.versions.length, 'versions')
+    return { success: true, versions: data.versions }
+  } catch (error) {
+    console.error('Error getting version history:', error)
+    return { 
+      success: false, 
+      error: error instanceof Error ? error.message : 'Unknown error',
+      versions: []
+    }
+  }
+}
+
+/**
+ * Helper: Restore a Previous Version
+ * 
+ * WHY: Users need to be able to roll back their document to a previous state.
+ * This is essential for recovering from mistakes or undoing major changes.
+ * 
+ * WHAT IT DOES:
+ * 1. Gets the current auth token
+ * 2. Calls backend /api/documents/:id/versions/:versionId/restore endpoint
+ * 3. The backend loads the version's Yjs state and updates the document
+ * 4. Yjs automatically syncs this change to all connected users
+ * 
+ * HOW IT WORKS:
+ * - Backend loads version from DocumentVersion table
+ * - Updates main Document's yjsState with version's state
+ * - Creates a new version snapshot marking the restore point
+ * - Yjs WebSocket broadcasts the change to all clients
+ * 
+ * WHEN TO USE:
+ * - When user clicks "Restore" on a version in the history panel
+ * 
+ * @param documentId - The document ID
+ * @param versionId - The version ID to restore
+ * @returns Success/error response
+ */
+export async function restoreVersion(documentId: string, versionId: string) {
+  try {
+    const token = await getAuthToken()
+
+    if (!token) {
+      console.error('No auth token available')
+      return { success: false, error: 'Not authenticated' }
+    }
+
+    const response = await fetch(
+      `${process.env.NEXT_PUBLIC_API_URL}/api/documents/${documentId}/versions/${versionId}/restore`,
+      {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      }
+    )
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({ error: 'Unknown error' }))
+      console.error('Failed to restore version:', response.status, errorData)
+      return { 
+        success: false, 
+        error: errorData.error || `Server error: ${response.status}` 
+      }
+    }
+
+    const data = await response.json()
+    console.log('✅ Version restored successfully')
+    return { success: true, message: data.message }
+  } catch (error) {
+    console.error('Error restoring version:', error)
+    return { 
+      success: false, 
+      error: error instanceof Error ? error.message : 'Unknown error' 
+    }
+  }
+}
+
+/**
+ * Helper: Create a Manual Version Snapshot
+ * 
+ * WHY: Users may want to manually save a snapshot at important milestones
+ * (e.g., "Before redesign", "Final version for review").
+ * 
+ * WHAT IT DOES:
+ * 1. Gets the current auth token
+ * 2. Serializes the current Yjs document state
+ * 3. Calls backend /api/documents/:id/versions with the state and optional label
+ * 4. Backend saves the provided state as a new version
+ * 
+ * WHY WE SEND STATE: The database might be stale. The Yjs WebSocket keeps the
+ * document in memory and only saves to DB periodically. By sending the current
+ * state from the client, we guarantee we're saving what's actually on the canvas.
+ * 
+ * @param documentId - The document ID
+ * @param label - Optional description for the snapshot
+ * @param yjsDoc - The Yjs document to save (optional, for when called from Canvas)
+ * @returns Success/error response
+ */
+export async function createVersionSnapshot(documentId: string, label?: string, yjsDoc?: any) {
+  try {
+    const token = await getAuthToken()
+
+    if (!token) {
+      console.error('No auth token available')
+      return { success: false, error: 'Not authenticated' }
+    }
+
+    // Serialize the Yjs document if provided
+    let yjsStateBase64: string | undefined
+    if (yjsDoc) {
+      try {
+        // Import Y namespace (needed for encoding)
+        const Y = await import('yjs')
+        const state = Y.encodeStateAsUpdate(yjsDoc)
+        yjsStateBase64 = Buffer.from(state).toString('base64')
+        console.log(`[Frontend] Sending ${state.length} bytes of Yjs state to backend`)
+      } catch (error) {
+        console.error('[Frontend] Failed to serialize Yjs doc:', error)
+        // Continue without state - backend will use database as fallback
+      }
+    }
+
+    const response = await fetch(
+      `${process.env.NEXT_PUBLIC_API_URL}/api/documents/${documentId}/versions`,
+      {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ label, yjsStateBase64 }),
+      }
+    )
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({ error: 'Unknown error' }))
+      console.error('Failed to create version snapshot:', response.status, errorData)
+      return { 
+        success: false, 
+        error: errorData.error || `Server error: ${response.status}` 
+      }
+    }
+
+    const data = await response.json()
+    console.log('✅ Version snapshot created successfully')
+    return { success: true, message: data.message }
+  } catch (error) {
+    console.error('Error creating version snapshot:', error)
+    return { 
+      success: false, 
+      error: error instanceof Error ? error.message : 'Unknown error' 
+    }
+  }
+}
+
+/**
+ * Helper: Delete All Version History for a Document
+ * 
+ * WHY: Teams may want to clear the entire version history (cleanup, privacy).
+ * 
+ * WHAT IT DOES:
+ * 1. Gets the current auth token
+ * 2. Calls backend DELETE /api/documents/:id/versions endpoint
+ * 3. Backend removes all DocumentVersion rows for the document
+ * 
+ * @param documentId - The document ID
+ * @returns Success flag, message, and deletedCount when available
+ */
+export async function deleteAllVersions(documentId: string) {
+  try {
+    const token = await getAuthToken()
+
+    if (!token) {
+      console.error('No auth token available')
+      return { success: false, error: 'Not authenticated', deletedCount: 0 }
+    }
+
+    const response = await fetch(
+      `${process.env.NEXT_PUBLIC_API_URL}/api/documents/${documentId}/versions`,
+      {
+        method: 'DELETE',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      }
+    )
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({ error: 'Unknown error' }))
+      console.error('Failed to delete version history:', response.status, errorData)
+      return {
+        success: false,
+        error: errorData.error || `Server error: ${response.status}`,
+        deletedCount: 0,
+      }
+    }
+
+    const data = await response.json()
+    console.log('✅ Version history deleted successfully')
+    return { success: true, message: data.message, deletedCount: data.deletedCount ?? 0 }
+  } catch (error) {
+    console.error('Error deleting version history:', error)
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error',
+      deletedCount: 0,
+    }
+  }
+}
+

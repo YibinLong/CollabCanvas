@@ -29,8 +29,8 @@ export default function Home() {
   // Get clearShapes function from Zustand store
   const clearShapes = useCanvasStore((state) => state.clearShapes)
   
-  // State for collapsible controls panel (starts open so new users see it)
-  const [controlsOpen, setControlsOpen] = useState(true)
+  // State for collapsible controls panel (starts closed so new users don't see it by default)
+  const [controlsOpen, setControlsOpen] = useState(false)
   
   // State for version history panel
   const [versionHistoryOpen, setVersionHistoryOpen] = useState(false)

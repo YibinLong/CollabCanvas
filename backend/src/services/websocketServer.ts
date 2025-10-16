@@ -457,6 +457,19 @@ export function getServerStats() {
 }
 
 /**
+ * Get the Yjs document for a specific room
+ * 
+ * WHY: Allows AI commands to be executed on the canvas document.
+ * The AI controller needs access to the Yjs document to modify shapes.
+ * 
+ * @param roomName - The document/room ID
+ * @returns The Yjs document, or undefined if not found
+ */
+export function getYjsDocumentForRoom(roomName: string): Y.Doc | undefined {
+  return docs.get(roomName)
+}
+
+/**
  * Close a room and disconnect all clients
  * 
  * WHY: Useful for admin operations (force-close a document, etc.)

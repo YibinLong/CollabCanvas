@@ -18,6 +18,7 @@ import http from 'http';
 import { createWebSocketServer, getServerStats } from './services/websocketServer';
 import documentRoutes from './routes/documentRoutes';
 import authRoutes from './routes/authRoutes';
+import aiRoutes from './routes/aiRoutes';
 
 // Load environment variables from .env file
 dotenv.config();
@@ -143,8 +144,8 @@ app.use('/api/auth', authRoutes);
 // Document management routes (PR #17)
 app.use('/api/documents', documentRoutes);
 
-// Future routes
-// app.use('/api/ai', aiRoutes);
+// AI command interpretation routes (PR #29-30)
+app.use('/api/ai', aiRoutes);
 
 /**
  * Error Handling Middleware

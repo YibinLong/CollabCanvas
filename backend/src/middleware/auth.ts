@@ -66,7 +66,15 @@ export async function authenticateJWT(
     // Format: "Bearer <token>"
     const authHeader = req.headers.authorization;
     
+    // Debug logging
+    console.log('🔐 Auth Debug:', {
+      hasAuthHeader: !!authHeader,
+      headerPreview: authHeader ? authHeader.substring(0, 30) + '...' : 'NONE',
+      path: req.path,
+    });
+    
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      console.log('❌ Auth failed: No token provided');
       return res.status(401).json({ error: 'No token provided' });
     }
 
@@ -75,6 +83,8 @@ export async function authenticateJWT(
     // Verify token with Supabase using verifyToken helper
     const user = await verifyToken(token);
     
+    console.log('✅ Auth success: User', user.id);
+    
     // Attach user ID to request for use in controllers
     (req as any).userId = user.id;
     (req as any).user = user; // Also attach full user object for convenience
@@ -82,7 +92,7 @@ export async function authenticateJWT(
     // Continue to route handler
     next();
   } catch (error) {
-    console.error('Auth error:', error);
+    console.error('❌ Auth error:', error);
     res.status(401).json({ error: 'Invalid or expired token' });
   }
 }

@@ -188,6 +188,15 @@ export async function signOutOthers() {
  */
 export async function getUserMetadata(accessToken?: string) {
   try {
+    // Sanity check: Warn if environment variable is missing
+    if (!process.env.NEXT_PUBLIC_API_URL) {
+      console.error(
+        '[API] ❌ NEXT_PUBLIC_API_URL is not set!\n' +
+        '   API calls will fail. Fix: Add NEXT_PUBLIC_API_URL=http://localhost:4000 to frontend/.env.local'
+      )
+      return null
+    }
+
     // Reuse provided token when available to avoid unnecessary refresh calls
     let token: string | null | undefined = accessToken
 

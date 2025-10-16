@@ -121,6 +121,15 @@ export function useYjsSync(
        */
       const serverUrl = wsUrl || process.env.NEXT_PUBLIC_WS_URL || 'ws://localhost:4000'
       
+      // Sanity check: Warn if environment variable is missing
+      if (!process.env.NEXT_PUBLIC_WS_URL && !wsUrl) {
+        console.warn(
+          '[Yjs] ⚠️  NEXT_PUBLIC_WS_URL is not set! Using fallback: ws://localhost:4000\n' +
+          '   This may cause sync issues if accessing via 127.0.0.1 or LAN IP.\n' +
+          '   Fix: Add NEXT_PUBLIC_WS_URL=ws://localhost:4000 to frontend/.env.local'
+        )
+      }
+      
       // Get JWT token for authentication
       const token = await getAuthToken()
       

@@ -263,12 +263,20 @@ See [TASK_LIST.md](./TASK_LIST.md) for what's coming next.
 Create `frontend/.env.local` with:
 
 ```env
+# Backend URLs - IMPORTANT: Must be set to avoid sync issues!
 NEXT_PUBLIC_API_URL=http://localhost:4000
-NEXT_PUBLIC_BACKEND_URL=http://localhost:4000
-NEXT_PUBLIC_WS_URL=ws://localhost:4001
+NEXT_PUBLIC_WS_URL=ws://localhost:4000
+
+# Supabase Configuration
 NEXT_PUBLIC_SUPABASE_URL=https://xxx.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your_anon_key
 ```
+
+**⚠️ Local Sync Issues?** If users see different canvases on localhost:
+- Ensure `NEXT_PUBLIC_API_URL` and `NEXT_PUBLIC_WS_URL` are set (don't rely on fallbacks)
+- Use `localhost` consistently (avoid mixing with `127.0.0.1`)
+- Check browser console for CORS or WebSocket errors
+- Restart both frontend and backend after changing env vars
 
 ### Backend (.env)
 

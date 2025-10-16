@@ -53,15 +53,28 @@ app.use(
       
       // List of allowed origins
       const allowedOrigins = [
-        'http://localhost:3000',  // Local development
-        'http://localhost:4000',  // Local backend (for testing)
-        process.env.FRONTEND_URL, // Main production URL
+        'http://localhost:3000',     // Local development (localhost)
+        'http://127.0.0.1:3000',     // Local development (127.0.0.1)
+        'http://localhost:4000',     // Local backend (for testing)
+        'http://127.0.0.1:4000',     // Local backend (127.0.0.1)
+        process.env.FRONTEND_URL,    // Main production URL
         'https://collab-canvas-gauntlet.vercel.app', // Vercel production
       ].filter(Boolean); // Remove undefined/empty values
       
       // Check if the origin is allowed
       if (allowedOrigins.indexOf(origin) !== -1 || origin.endsWith('.vercel.app')) {
         callback(null, true);
+      } else if (process.env.NODE_ENV === 'development') {
+        // In development, allow LAN IPs (e.g., http://192.168.1.5:3000)
+        // This allows testing across devices on the same network
+        const isLocalNetwork = /^http:\/\/(192\.168\.\d{1,3}\.\d{1,3}|10\.\d{1,3}\.\d{1,3}\.\d{1,3}|172\.(1[6-9]|2\d|3[01])\.\d{1,3}\.\d{1,3}):(3000|4000)$/.test(origin);
+        if (isLocalNetwork) {
+          console.log(`CORS: Allowing LAN origin in development: ${origin}`);
+          callback(null, true);
+        } else {
+          console.warn(`CORS: Blocked request from origin: ${origin}`);
+          callback(new Error('Not allowed by CORS'));
+        }
       } else {
         console.warn(`CORS: Blocked request from origin: ${origin}`);
         callback(new Error('Not allowed by CORS'));

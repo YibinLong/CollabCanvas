@@ -16,6 +16,7 @@ import Canvas from '@/components/Canvas'
 import Toolbar from '@/components/Toolbar'
 import UserAvatars from '@/components/UserAvatars'
 import VersionHistory from '@/components/VersionHistory'
+import AIAssistant from '@/components/AIAssistant'
 import { useAuth } from '@/lib/AuthContext'
 import { useYjsSync } from '@/lib/useYjsSync'
 import { usePresence } from '@/lib/usePresence'
@@ -273,6 +274,9 @@ export default function Home() {
         onRestore={handleVersionRestore}
         yjsDoc={provider?.doc}
       />
+
+      {/* AI Assistant (Bottom-Right Circular Button) */}
+      <AIAssistant documentId={documentId} />
     </main>
   )
 }

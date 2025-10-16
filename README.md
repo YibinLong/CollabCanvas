@@ -1,21 +1,23 @@
 # CollabCanvas - Figma Clone
 
-> A real-time collaborative design tool with AI assistance, inspired by Figma.
+> A real-time collaborative design tool inspired by Figma.
 
-CollabCanvas allows multiple users to create and edit vector shapes together in real-time, with each user's cursor visible to others. An AI assistant can manipulate the canvas using natural language commands like "create a 3x3 grid of buttons."
+CollabCanvas allows multiple users to create and edit vector shapes together in real-time, with each user's cursor visible to others. Built with modern web technologies, it features persistent storage, authentication, and advanced editing tools like keyboard shortcuts and shape alignment.
 
 ## ✨ Features
 
 - 🎨 **Vector Canvas** - Draw rectangles, circles, lines, and text
 - 🤝 **Real-Time Collaboration** - See other users' cursors and edits instantly
-- 🤖 **AI Assistant** - Create and arrange shapes with natural language
 - 🔐 **Authentication** - Secure login with Supabase Auth
-- 💾 **Persistent Storage** - Documents saved to PostgreSQL
+- 💾 **Persistent Storage** - Documents saved to PostgreSQL with version history
 - ⚡ **Low Latency** - Sub-100ms sync using Yjs CRDTs
+- ⌨️ **Keyboard Shortcuts** - Arrow keys, copy/paste (Cmd+C/V), duplicate (Cmd+D)
+- 📐 **Alignment Tools** - Align and distribute shapes like a pro
+- 🔒 **Conflict Resolution** - Smart shape locking prevents edit conflicts
 
 ## 🏗️ Project Structure
 
-```
+```text
 Figma_Clone/
 ├── frontend/          # Next.js React app
 │   ├── app/          # Pages and layouts
@@ -46,7 +48,7 @@ Figma_Clone/
 │   └── DEPLOY_NOW.sh     # Deployment script
 │
 ├── PRD.md            # Product Requirements Document
-├── TASK_LIST.md      # Development roadmap (39 PRs)
+├── TASK_LIST.md      # Development roadmap (44 PRs total)
 └── README.md         # This file
 ```
 
@@ -57,7 +59,7 @@ Figma_Clone/
 - **Node.js** 18+ and npm
 - **PostgreSQL** database (or use Supabase)
 - **Supabase account** (for auth and database)
-- **OpenAI API key** (for AI features)
+- **OpenAI API key** (optional, only needed for Phase 7 AI features)
 
 ### 1. Clone Repository
 
@@ -71,8 +73,7 @@ cd Figma_Clone
 ```bash
 cd frontend
 npm install
-cp .env.example .env.local
-# Edit .env.local with your values
+# Create .env.local with your values (see Environment Variables section below)
 npm run dev
 ```
 
@@ -83,14 +84,13 @@ Frontend runs on **http://localhost:3000**
 ```bash
 cd backend
 npm install
-cp .env.example .env
-# Edit .env with your values
+# Create .env with your values (see Environment Variables section below)
 npm run dev
 ```
 
 Backend runs on **http://localhost:4000**
 
-See [Frontend README](./frontend/README.md) and [Backend README](./backend/README.md) for detailed setup instructions.
+See [Setup Database Guide](./docs/guides/SETUP_DATABASE.md) and [Quick Start Guide](./docs/guides/QUICK_START.md) for detailed instructions.
 
 ## 🛠️ Tech Stack
 
@@ -110,8 +110,8 @@ See [Frontend README](./frontend/README.md) and [Backend README](./backend/READM
 - **Yjs + y-websocket** - Real-time sync server
 - **Prisma** - Database ORM
 - **PostgreSQL** - Relational database
-- **OpenAI API** - AI command interpretation
 - **Supabase** - Authentication
+- **OpenAI API** - AI command interpretation (Phase 7, pending)
 
 ### Infrastructure
 
@@ -179,10 +179,10 @@ For detailed implementation and testing instructions, see [Conflict Resolution D
 
 ### Essential Docs
 
-- **[START_HERE.md](./docs/guides/START_HERE.md)** - New user entry point
 - **[PRD.md](./PRD.md)** - Complete product requirements
-- **[TASK_LIST.md](./TASK_LIST.md)** - 39 PRs from setup to production
+- **[TASK_LIST.md](./TASK_LIST.md)** - Development roadmap (Phases 1-6 complete)
 - **[Documentation Index](./docs/INDEX.md)** - Complete documentation map
+- **[START_HERE.md](./docs/guides/START_HERE.md)** - New user setup guide
 
 ### Quick Links
 
@@ -207,36 +207,49 @@ This project follows **Test-Driven Development (TDD)**:
 3. ♻️ Refactor while keeping tests green
 
 Each feature is split into:
+
 - **Test PR** - Write tests that define expected behavior
 - **Implementation PR** - Write code to make tests pass
 
-See [TASK_LIST.md](./TASK_LIST.md) for the complete 39-PR roadmap.
+See [TASK_LIST.md](./TASK_LIST.md) for the complete development roadmap.
 
 ## 📋 Current Status
 
-**✅ Phase 1-3 Complete!**
+**✅ Phases 1-6 Complete!**
 
-- ✅ **Phase 1:** Foundation & Testing Infrastructure (PR #1-3)
-- ✅ **Phase 2:** Core Canvas (PR #4-9)
-- ✅ **Phase 3:** Real-Time Collaboration (PR #10-15)
-- 🔄 **Phase 4:** Backend & Persistence (Pending)
+- ✅ **Phase 1:** Foundation & Testing Infrastructure
+- ✅ **Phase 2:** Core Canvas (shapes, selection, manipulation)
+- ✅ **Phase 3:** Real-Time Collaboration (Yjs sync, cursors, presence)
+- ✅ **Phase 4:** Backend & Persistence (PostgreSQL, Prisma, document API)
+- ✅ **Phase 5:** Authentication (Supabase Auth, JWT, protected routes)
+- ✅ **Phase 6:** Advanced Canvas Features (keyboard shortcuts, alignment tools)
+- 🔄 **Phase 7:** AI Integration (Pending)
 
-**Test Results:** 101/101 tests passing ✅
+**Test Results:** 213 tests passing ✅
 
-- Backend: 32 tests
-- Frontend: 69 tests
+- Frontend: 135 tests
+- Backend: 78 tests
 
-**⏭️ Next Steps:**
+**✨ Key Features Working:**
 
-- PR #16-17: Document Management API
-- PR #18-19: Yjs Persistence
-- PR #20-23: Authentication
+- Real-time collaboration with multiple users
+- Document persistence and version history
+- User authentication and protected routes
+- Arrow keys, copy/paste (Cmd+C/V), duplicate (Cmd+D)
+- Shape alignment and distribution tools
+- Conflict resolution with shape locking
 
-See [TASK_LIST.md](./TASK_LIST.md) for complete roadmap and [Test Summary](./docs/status-reports/TEST_SUMMARY_PHASE1-3.md) for details.
+**Next Up: AI Assistant (Phase 7)**
+
+- OpenAI integration for natural language commands
+- "Create a 3x3 grid of circles" type commands
+
+See [TASK_LIST.md](./TASK_LIST.md) for complete roadmap.
 
 ## 🤝 Contributing
 
 This project is being built PR by PR following the task list. Each PR is:
+
 - Small and focused
 - Well-tested
 - Documented
@@ -247,24 +260,31 @@ See [TASK_LIST.md](./TASK_LIST.md) for what's coming next.
 
 ### Frontend (.env.local)
 
+Create `frontend/.env.local` with:
+
 ```env
 NEXT_PUBLIC_API_URL=http://localhost:4000
+NEXT_PUBLIC_BACKEND_URL=http://localhost:4000
 NEXT_PUBLIC_WS_URL=ws://localhost:4001
 NEXT_PUBLIC_SUPABASE_URL=https://xxx.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=your_key
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your_anon_key
 ```
 
 ### Backend (.env)
+
+Create `backend/.env` with:
 
 ```env
 PORT=4000
 DATABASE_URL=postgresql://user:pass@localhost:5432/collabcanvas
 SUPABASE_URL=https://xxx.supabase.co
-SUPABASE_SERVICE_KEY=your_key
-OPENAI_API_KEY=sk-your-key
+SUPABASE_SERVICE_KEY=your_service_key
+# OPENAI_API_KEY=sk-your-key  # Only needed for Phase 7 (AI features)
 ```
 
 **⚠️ Never commit .env files to Git!**
+
+See [Setup Database Guide](./docs/guides/SETUP_DATABASE.md) for database configuration.
 
 ## 📚 Complete Documentation Map
 
@@ -291,6 +311,7 @@ All project documentation is organized in the [`docs/`](./docs) folder:
 **For Beginners:**
 
 Every code file includes comments explaining:
+
 - **WHY** we're doing something
 - **WHAT** each piece of code does
 - **HOW** it fits into the larger system

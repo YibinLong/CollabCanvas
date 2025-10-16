@@ -20,8 +20,17 @@
 
 'use client'
 
-import { useEffect, useRef, useState, useCallback } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useCanvasStore, GRID_WIDTH, GRID_HEIGHT, BASE_VIEWPORT_WIDTH, BASE_VIEWPORT_HEIGHT, DEFAULT_VIEWPORT_ZOOM } from '@/lib/canvasStore'
+import { 
+  generateShapeId, 
+  calculateMoveUpdates, 
+  constrainToGrid, 
+  screenToSVG as screenToSVGUtil,
+  getShapeCenter,
+  duplicateShape,
+  calculateRectangularResize
+} from '@/lib/canvasUtils'
 import { WebsocketProvider } from 'y-websocket'
 import type { CurrentUser } from '@/lib/usePresence'
 import type { PresenceUser } from './CursorOverlay'
@@ -38,115 +47,7 @@ import ContextMenu from './ContextMenu'
 import type { Shape } from '@/types/canvas'
 
 // Interaction modes
-// WHY: Added 'rotating' mode for when user drags the rotation handle
 type InteractionMode = 'none' | 'panning' | 'creating' | 'moving' | 'resizing' | 'rotating'
-
-/**
- * Generate a unique ID for shapes
- */
-function generateId(): string {
-  return `shape-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
-}
-
-/**
- * Calculate position updates for moving a shape
- * 
- * WHY: Different shape types need different properties updated when moved.
- * Lines have x, y, x2, y2 (start and end points) so both need to move.
- * Other shapes only have x, y.
- * 
- * @param shape - The shape being moved
- * @param deltaX - How much to move horizontally
- * @param deltaY - How much to move vertically
- * @returns Object with the properties that need to be updated
- */
-function calculateMoveUpdates(shape: Shape, deltaX: number, deltaY: number): Partial<Shape> {
-  const baseUpdate = {
-    x: shape.x + deltaX,
-    y: shape.y + deltaY,
-  }
-  
-  // Lines need both start point (x, y) and end point (x2, y2) moved
-  if (shape.type === 'line') {
-    return {
-      ...baseUpdate,
-      x2: shape.x2 + deltaX,
-      y2: shape.y2 + deltaY,
-    }
-  }
-  
-  // Other shapes only need x, y updated
-  return baseUpdate
-}
-
-/**
- * Constrain shape position to grid boundaries
- * 
- * WHY: Shapes should not be able to move outside the grid boundaries.
- * This ensures shapes stay within the defined canvas area.
- * 
- * HOW: For each shape type, calculate its bounding box and constrain
- * all points to be within [0, GRID_WIDTH] and [0, GRID_HEIGHT]
- * 
- * @param updates - The proposed updates to the shape
- * @param shape - The current shape (for getting dimensions)
- * @returns Constrained updates that keep shape within grid
- */
-function constrainToGrid(updates: Partial<Shape>, shape: Shape): Partial<Shape> {
-  const constrained = { ...updates }
-  
-  if (shape.type === 'rect') {
-    const width = shape.width
-    const height = shape.height
-    
-    // Constrain x: left edge must be >= 0, right edge must be <= GRID_WIDTH
-    if (constrained.x !== undefined) {
-      constrained.x = Math.max(0, Math.min(GRID_WIDTH - width, constrained.x))
-    }
-    // Constrain y: top edge must be >= 0, bottom edge must be <= GRID_HEIGHT
-    if (constrained.y !== undefined) {
-      constrained.y = Math.max(0, Math.min(GRID_HEIGHT - height, constrained.y))
-    }
-  } else if (shape.type === 'circle') {
-    // WHY: Circles now use bounding box, so constraints work exactly like rectangles!
-    const width = shape.width
-    const height = shape.height
-    
-    // Constrain x: left edge must be >= 0, right edge must be <= GRID_WIDTH
-    if (constrained.x !== undefined) {
-      constrained.x = Math.max(0, Math.min(GRID_WIDTH - width, constrained.x))
-    }
-    // Constrain y: top edge must be >= 0, bottom edge must be <= GRID_HEIGHT
-    if (constrained.y !== undefined) {
-      constrained.y = Math.max(0, Math.min(GRID_HEIGHT - height, constrained.y))
-    }
-  } else if (shape.type === 'line') {
-    // For lines, constrain both start (x, y) and end (x2, y2) points
-    if (constrained.x !== undefined) {
-      constrained.x = Math.max(0, Math.min(GRID_WIDTH, constrained.x))
-    }
-    if (constrained.y !== undefined) {
-      constrained.y = Math.max(0, Math.min(GRID_HEIGHT, constrained.y))
-    }
-    // TypeScript needs to know these properties exist on line type
-    if ('x2' in constrained && constrained.x2 !== undefined) {
-      constrained.x2 = Math.max(0, Math.min(GRID_WIDTH, constrained.x2))
-    }
-    if ('y2' in constrained && constrained.y2 !== undefined) {
-      constrained.y2 = Math.max(0, Math.min(GRID_HEIGHT, constrained.y2))
-    }
-  } else if (shape.type === 'text') {
-    // For text, just constrain the position point
-    if (constrained.x !== undefined) {
-      constrained.x = Math.max(0, Math.min(GRID_WIDTH, constrained.x))
-    }
-    if (constrained.y !== undefined) {
-      constrained.y = Math.max(0, Math.min(GRID_HEIGHT, constrained.y))
-    }
-  }
-  
-  return constrained
-}
 
 /**
  * Canvas Component Props
@@ -154,18 +55,25 @@ function constrainToGrid(updates: Partial<Shape>, shape: Shape): Partial<Shape> 
  * WHY: Canvas now receives presence data from parent (page.tsx)
  * so that user avatars can be displayed in the header while
  * Canvas still tracks cursor movements.
+ * 
+ * All props are optional for backward compatibility with tests.
  */
 interface CanvasProps {
-  provider: WebsocketProvider | null
-  users: PresenceUser[]
-  updateCursor: (x: number | null, y: number | null) => void
-  currentUser: CurrentUser
+  provider?: WebsocketProvider | null
+  users?: PresenceUser[]
+  updateCursor?: (x: number | null, y: number | null) => void
+  currentUser?: CurrentUser
 }
 
 /**
  * Canvas Component
  */
-export default function Canvas({ provider, users, updateCursor, currentUser }: CanvasProps) {
+export default function Canvas({ 
+  provider = null, 
+  users = [], 
+  updateCursor = () => {}, 
+  currentUser = { id: 'test-user', name: 'Test User', color: '#3b82f6' } 
+}: CanvasProps = {}) {
   const { 
     shapes, 
     viewport, 
@@ -261,37 +169,17 @@ export default function Canvas({ provider, users, updateCursor, currentUser }: C
   })
   
   /**
-   * Convert screen coordinates to SVG coordinates
-   * 
-   * WHY: Mouse events give us screen (pixel) coordinates, but we need
-   * to convert them to SVG world coordinates considering pan/zoom.
-   * 
-   * HOW: Uses the actual client dimensions and current viewport state
-   * to accurately map screen pixels to SVG coordinate space.
+   * Convert screen coordinates to SVG coordinates (wrapper for utility function)
    */
   const screenToSVG = (screenX: number, screenY: number): { x: number; y: number } => {
-    if (!svgRef.current) return { x: screenX, y: screenY }
-    
-    const rect = svgRef.current.getBoundingClientRect()
-    const actualWidth = clientWidth ?? BASE_VIEWPORT_WIDTH
-    const actualHeight = clientHeight ?? BASE_VIEWPORT_HEIGHT
-    
-    const viewBoxWidth = actualWidth / viewport.zoom
-    const viewBoxHeight = actualHeight / viewport.zoom
-    const viewBoxX = -viewport.x / viewport.zoom
-    const viewBoxY = -viewport.y / viewport.zoom
-    
-    // Guard against invalid dimensions (happens in tests)
-    if (!rect.width || !rect.height || rect.width === 0 || rect.height === 0) {
-      // Fallback: just return screen coords as-is (for test environment)
-      return { x: screenX, y: screenY }
-    }
-    
-    // Convert screen coords to SVG coords
-    const x = viewBoxX + ((screenX - rect.left) / rect.width) * viewBoxWidth
-    const y = viewBoxY + ((screenY - rect.top) / rect.height) * viewBoxHeight
-    
-    return { x, y }
+    return screenToSVGUtil(
+      screenX,
+      screenY,
+      svgRef.current,
+      viewport,
+      clientWidth ?? BASE_VIEWPORT_WIDTH,
+      clientHeight ?? BASE_VIEWPORT_HEIGHT
+    )
   }
   const [clientWidth, setClientWidth] = useState<number | null>(null)
   const [clientHeight, setClientHeight] = useState<number | null>(null)
@@ -377,7 +265,7 @@ export default function Canvas({ provider, users, updateCursor, currentUser }: C
     
     // If clicking empty canvas with a shape tool, start creating
     if (isEmptyCanvas && currentTool !== 'select') {
-      const shapeId = generateId()
+      const shapeId = generateShapeId()
       
       // Constrain initial position to grid boundaries
       const constrainedX = Math.max(0, Math.min(GRID_WIDTH, svgCoords.x))
@@ -505,7 +393,7 @@ export default function Canvas({ provider, users, updateCursor, currentUser }: C
             // Use helper function to calculate correct updates for each shape type
             const shapeUpdates = calculateMoveUpdates(initialShape, deltaShapeX, deltaShapeY)
             // CONSTRAIN: Apply boundary constraints to keep shape on grid
-            const constrainedUpdates = constrainToGrid(shapeUpdates, initialShape)
+            const constrainedUpdates = constrainToGrid(shapeUpdates, initialShape, GRID_WIDTH, GRID_HEIGHT)
             updates.push({
               id: shapeId,
               updates: constrainedUpdates
@@ -521,7 +409,7 @@ export default function Canvas({ provider, users, updateCursor, currentUser }: C
             // Use helper function to calculate correct updates for the shape type
             const shapeUpdates = calculateMoveUpdates(interactionStateRef.current.initialShape, deltaShapeX, deltaShapeY)
             // CONSTRAIN: Apply boundary constraints to keep shape on grid
-            const constrainedUpdates = constrainToGrid(shapeUpdates, interactionStateRef.current.initialShape)
+            const constrainedUpdates = constrainToGrid(shapeUpdates, interactionStateRef.current.initialShape, GRID_WIDTH, GRID_HEIGHT)
             updateShape(interactionStateRef.current.shapeId, constrainedUpdates)
           }
         }
@@ -536,133 +424,25 @@ export default function Canvas({ provider, users, updateCursor, currentUser }: C
         const dx = svgCoords.x - interactionStateRef.current.startX
         const dy = svgCoords.y - interactionStateRef.current.startY
         
-        if (resizingShape.type === 'rect') {
-          let newX = resizingShape.x
-          let newY = resizingShape.y
-          let newWidth = resizingShape.width
-          let newHeight = resizingShape.height
+        // Rect, circle, and text all resize the same way (bounding box)
+        if (resizingShape.type === 'rect' || resizingShape.type === 'circle' || resizingShape.type === 'text') {
+          // Set minimum size based on shape type
+          const minWidth = resizingShape.type === 'text' ? 50 : 10
+          const minHeight = resizingShape.type === 'text' ? 30 : 10
           
-          // Update based on which handle is being dragged
-          if (handlePos.includes('l')) {
-            newX = resizingShape.x + dx
-            newWidth = resizingShape.width - dx
-          }
-          if (handlePos.includes('r')) {
-            newWidth = resizingShape.width + dx
-          }
-          if (handlePos.includes('t')) {
-            newY = resizingShape.y + dy
-            newHeight = resizingShape.height - dy
-          }
-          if (handlePos.includes('b')) {
-            newHeight = resizingShape.height + dy
-          }
+          // Use utility function to calculate resize
+          const resizeResult = calculateRectangularResize(
+            resizingShape,
+            handlePos,
+            dx,
+            dy,
+            minWidth,
+            minHeight,
+            GRID_WIDTH,
+            GRID_HEIGHT
+          )
           
-          // Ensure minimum size
-          if (newWidth < 10) newWidth = 10
-          if (newHeight < 10) newHeight = 10
-          
-          // Constrain to grid boundaries
-          // WHY: Prevent resizing shapes beyond grid edges
-          newX = Math.max(0, Math.min(GRID_WIDTH - newWidth, newX))
-          newY = Math.max(0, Math.min(GRID_HEIGHT - newHeight, newY))
-          
-          // Adjust width/height if they would exceed grid
-          newWidth = Math.min(newWidth, GRID_WIDTH - newX)
-          newHeight = Math.min(newHeight, GRID_HEIGHT - newY)
-          
-          updateShape(interactionStateRef.current.shapeId, {
-            x: newX,
-            y: newY,
-            width: newWidth,
-            height: newHeight,
-          })
-        } else if (resizingShape.type === 'circle') {
-          // WHY: Circles now use bounding box and resize exactly like rectangles!
-          // This gives consistent behavior across all shape types
-          let newX = resizingShape.x
-          let newY = resizingShape.y
-          let newWidth = resizingShape.width
-          let newHeight = resizingShape.height
-          
-          // Update based on which handle is being dragged (same logic as rectangles)
-          if (handlePos.includes('l')) {
-            newX = resizingShape.x + dx
-            newWidth = resizingShape.width - dx
-          }
-          if (handlePos.includes('r')) {
-            newWidth = resizingShape.width + dx
-          }
-          if (handlePos.includes('t')) {
-            newY = resizingShape.y + dy
-            newHeight = resizingShape.height - dy
-          }
-          if (handlePos.includes('b')) {
-            newHeight = resizingShape.height + dy
-          }
-          
-          // Ensure minimum size
-          if (newWidth < 10) newWidth = 10
-          if (newHeight < 10) newHeight = 10
-          
-          // Constrain to grid boundaries (same as rectangles)
-          newX = Math.max(0, Math.min(GRID_WIDTH - newWidth, newX))
-          newY = Math.max(0, Math.min(GRID_HEIGHT - newHeight, newY))
-          
-          // Adjust width/height if they would exceed grid
-          newWidth = Math.min(newWidth, GRID_WIDTH - newX)
-          newHeight = Math.min(newHeight, GRID_HEIGHT - newY)
-          
-          updateShape(interactionStateRef.current.shapeId, {
-            x: newX,
-            y: newY,
-            width: newWidth,
-            height: newHeight,
-          })
-        } else if (resizingShape.type === 'text') {
-          // Text resizing: update width and height of the text box
-          // WHY: Text boxes work like rectangles - they have x, y, width, height
-          // The text content flows within these bounds
-          
-          let newX = resizingShape.x
-          let newY = resizingShape.y
-          let newWidth = resizingShape.width
-          let newHeight = resizingShape.height
-          
-          // Update based on which handle is being dragged
-          if (handlePos.includes('l')) {
-            newX = resizingShape.x + dx
-            newWidth = resizingShape.width - dx
-          }
-          if (handlePos.includes('r')) {
-            newWidth = resizingShape.width + dx
-          }
-          if (handlePos.includes('t')) {
-            newY = resizingShape.y + dy
-            newHeight = resizingShape.height - dy
-          }
-          if (handlePos.includes('b')) {
-            newHeight = resizingShape.height + dy
-          }
-          
-          // Ensure minimum size for text box
-          if (newWidth < 50) newWidth = 50
-          if (newHeight < 30) newHeight = 30
-          
-          // Constrain to grid boundaries
-          newX = Math.max(0, Math.min(GRID_WIDTH - newWidth, newX))
-          newY = Math.max(0, Math.min(GRID_HEIGHT - newHeight, newY))
-          
-          // Adjust width/height if they would exceed grid
-          newWidth = Math.min(newWidth, GRID_WIDTH - newX)
-          newHeight = Math.min(newHeight, GRID_HEIGHT - newY)
-          
-          updateShape(interactionStateRef.current.shapeId, {
-            x: newX,
-            y: newY,
-            width: newWidth,
-            height: newHeight,
-          })
+          updateShape(interactionStateRef.current.shapeId, resizeResult)
         } else if (resizingShape.type === 'line') {
           // Line resizing: move the start or end point
           // WHY: Lines are defined by two points, so "resizing" means moving either endpoint
@@ -699,30 +479,18 @@ export default function Canvas({ provider, users, updateCursor, currentUser }: C
         const rotatingShape = interactionStateRef.current.initialShape
         
         // Calculate the center of the shape (rotation origin)
-        let centerX: number, centerY: number
-        
-        if (rotatingShape.type === 'rect' || rotatingShape.type === 'circle' || rotatingShape.type === 'text') {
-          // For shapes with width/height, center is x + width/2, y + height/2
-          centerX = rotatingShape.x + rotatingShape.width / 2
-          centerY = rotatingShape.y + rotatingShape.height / 2
-        } else if (rotatingShape.type === 'line') {
-          // For lines, center is midpoint between start and end
-          centerX = (rotatingShape.x + rotatingShape.x2) / 2
-          centerY = (rotatingShape.y + rotatingShape.y2) / 2
-        } else {
-          break
-        }
+        const center = getShapeCenter(rotatingShape)
         
         // Calculate angle from center to initial mouse position
         const startAngle = Math.atan2(
-          interactionStateRef.current.startY - centerY,
-          interactionStateRef.current.startX - centerX
+          interactionStateRef.current.startY - center.y,
+          interactionStateRef.current.startX - center.x
         )
         
         // Calculate angle from center to current mouse position
         const currentAngle = Math.atan2(
-          svgCoords.y - centerY,
-          svgCoords.x - centerX
+          svgCoords.y - center.y,
+          svgCoords.x - center.x
         )
         
         // Calculate the rotation delta (in radians) and convert to degrees
@@ -946,7 +714,7 @@ export default function Canvas({ provider, users, updateCursor, currentUser }: C
     
     // Check if shape is locked by another user
     if (isShapeLocked(shapeId, currentUser.id)) {
-      console.log(`Shape is currently being edited by another user`)
+      // Shape is locked - silently prevent interaction
       return
     }
     
@@ -986,7 +754,7 @@ export default function Canvas({ provider, users, updateCursor, currentUser }: C
     
     // Check if shape is locked by another user
     if (isShapeLocked(shapeId, currentUser.id)) {
-      console.log(`Shape is currently being edited by another user`)
+      // Shape is locked - silently prevent interaction
       return
     }
     
@@ -1114,36 +882,9 @@ export default function Canvas({ provider, users, updateCursor, currentUser }: C
             const shape = currentShapes.get(id)
             if (!shape) return
             
-            // Generate new ID for the duplicate
-            const newId = generateId()
-            newShapeIds.push(newId)
-            
-            // Clone the shape with 20px offset
-            let duplicate: Shape
-            
-            if (shape.type === 'line') {
-              // Lines need both endpoints offset
-              duplicate = {
-                ...shape,
-                id: newId,
-                x: shape.x + 20,
-                y: shape.y + 20,
-                x2: shape.x2 + 20,
-                y2: shape.y2 + 20,
-                lockedBy: null,
-                lockedAt: null,
-              }
-            } else {
-              // Other shapes just offset x, y
-              duplicate = {
-                ...shape,
-                id: newId,
-                x: shape.x + 20,
-                y: shape.y + 20,
-                lockedBy: null,
-                lockedAt: null,
-              }
-            }
+            // Clone the shape with 20px offset using utility function
+            const duplicate = duplicateShape(shape, 20, 20)
+            newShapeIds.push(duplicate.id)
             
             addShape(duplicate)
           })
@@ -1190,36 +931,9 @@ export default function Canvas({ provider, users, updateCursor, currentUser }: C
           
           // Paste each shape from clipboard
           clipboardRef.current.forEach(shape => {
-            // Generate new ID for the pasted shape
-            const newId = generateId()
-            newShapeIds.push(newId)
-            
-            // Clone the shape with 30px offset
-            let pasted: Shape
-            
-            if (shape.type === 'line') {
-              // Lines need both endpoints offset
-              pasted = {
-                ...shape,
-                id: newId,
-                x: shape.x + 30,
-                y: shape.y + 30,
-                x2: shape.x2 + 30,
-                y2: shape.y2 + 30,
-                lockedBy: null,
-                lockedAt: null,
-              }
-            } else {
-              // Other shapes just offset x, y
-              pasted = {
-                ...shape,
-                id: newId,
-                x: shape.x + 30,
-                y: shape.y + 30,
-                lockedBy: null,
-                lockedAt: null,
-              }
-            }
+            // Clone the shape with 30px offset using utility function
+            const pasted = duplicateShape(shape, 30, 30)
+            newShapeIds.push(pasted.id)
             
             addShape(pasted)
           })
@@ -1300,7 +1014,7 @@ export default function Canvas({ provider, users, updateCursor, currentUser }: C
             const shapeUpdates = calculateMoveUpdates(shape, deltaX, deltaY)
             
             // Apply grid boundary constraints
-            const constrainedUpdates = constrainToGrid(shapeUpdates, shape)
+            const constrainedUpdates = constrainToGrid(shapeUpdates, shape, GRID_WIDTH, GRID_HEIGHT)
             
             updates.push({ id, updates: constrainedUpdates })
           })
@@ -1367,7 +1081,7 @@ export default function Canvas({ provider, users, updateCursor, currentUser }: C
             shape.lockedBy !== currentUser.id && 
             shape.lockedAt && 
             (now - shape.lockedAt) > LOCK_TIMEOUT) {
-          console.log(`Auto-releasing stale lock on shape ${shape.id}`)
+          // Auto-release stale lock
           unlockShape(shape.id)
         }
       })
@@ -1376,7 +1090,7 @@ export default function Canvas({ provider, users, updateCursor, currentUser }: C
     return () => clearInterval(interval)
     // WHY: Removed 'shapes' from dependencies to prevent unnecessary interval recreation
     // The interval now uses getState() to always get the latest shapes
-  }, [currentUser.id, unlockShape])
+  }, [currentUser?.id, unlockShape])
   
   /**
    * Render a single shape
@@ -1408,8 +1122,7 @@ export default function Canvas({ provider, users, updateCursor, currentUser }: C
       
       // Check if shape is locked by another user
       if (isShapeLocked(shape.id, currentUser.id)) {
-        // Show a visual indication (could be improved with a toast notification)
-        console.log(`Shape is currently being edited by another user`)
+        // Shape is locked - silently prevent interaction
         return
       }
       
@@ -1694,7 +1407,7 @@ export default function Canvas({ provider, users, updateCursor, currentUser }: C
             const constrainedX = Math.max(0, Math.min(GRID_WIDTH, svgCoords.x))
             const constrainedY = Math.max(0, Math.min(GRID_HEIGHT, svgCoords.y))
             
-            const shapeId = generateId()
+            const shapeId = generateShapeId()
             
             const baseShape = {
               id: shapeId,

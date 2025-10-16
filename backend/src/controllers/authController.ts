@@ -52,8 +52,6 @@ export async function signup(req: Request, res: Response) {
         },
       });
 
-      console.log('✅ Created user metadata in database:', user.id, user.name);
-
       // Return success with user info
       res.status(201).json({
         message: 'User metadata created successfully',
@@ -66,7 +64,6 @@ export async function signup(req: Request, res: Response) {
     } catch (dbError: any) {
       // Check if user already exists
       if (dbError.code === 'P2002') {
-        console.log('User metadata already exists:', userId);
         // Fetch existing user and return it
         const existingUser = await prisma.user.findUnique({
           where: { id: userId },

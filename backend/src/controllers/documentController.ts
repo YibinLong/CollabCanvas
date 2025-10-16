@@ -319,8 +319,6 @@ export async function restoreVersion(req: Request, res: Response) {
       return res.status(401).json({ error: 'Unauthorized' });
     }
 
-    console.log(`[VERSION RESTORE] Starting restore for document ${id}, version ${versionId}`);
-
     // Find document to verify it exists
     const document = await prisma.document.findUnique({
       where: { id },
@@ -330,8 +328,6 @@ export async function restoreVersion(req: Request, res: Response) {
     if (!document) {
       return res.status(404).json({ error: 'Document not found' });
     }
-
-    console.log(`[VERSION RESTORE] Current document yjsState size: ${document.yjsState?.length || 0} bytes`);
 
     // NO OWNERSHIP CHECK - any authenticated user can restore versions
     // This allows collaborative editing without restrictions
@@ -350,31 +346,17 @@ export async function restoreVersion(req: Request, res: Response) {
     });
 
     if (!versionData) {
-      console.log(`[VERSION RESTORE] ERROR: Version ${versionId} not found for document ${id}`);
       return res.status(404).json({ error: 'Version not found for this document' });
     }
-
-    console.log(`[VERSION RESTORE] Found version: "${versionData.label || '(no label)'}", created ${versionData.createdAt}`);
-    console.log(`[VERSION RESTORE] Version yjsState size: ${versionData.yjsState.length} bytes`);
 
     // Load the version state into a new Yjs document
     const versionDoc = new Y.Doc();
     const versionState = new Uint8Array(versionData.yjsState);
     Y.applyUpdate(versionDoc, versionState);
 
-    // DEBUG: Log shapes in the version we're restoring
-    const versionShapesMap = versionDoc.getMap('shapes');
-    console.log(`[VERSION RESTORE] Shapes in version being restored: ${versionShapesMap.size} shapes`);
-    versionShapesMap.forEach((shape, shapeId) => {
-      const shapeObj = shape as Y.Map<any>;
-      console.log(`[VERSION RESTORE]   - Shape ${shapeId}: type=${shapeObj.get('type')}`);
-    });
-
     // Serialize it back to bytes for saving on the main document
     const state = Y.encodeStateAsUpdate(versionDoc);
     const buffer = Buffer.from(state);
-
-    console.log(`[VERSION RESTORE] Updating document with ${buffer.length} bytes`);
 
     // Update the document's state to match this version
     await prisma.document.update({
@@ -383,8 +365,6 @@ export async function restoreVersion(req: Request, res: Response) {
         yjsState: buffer,
       },
     });
-
-    console.log(`[VERSION RESTORE] Document updated in database`);
 
     // CRITICAL: Update the in-memory Yjs document on the WebSocket server
     // WHY: If we don't do this, when the user disconnects (during page reload),
@@ -396,8 +376,6 @@ export async function restoreVersion(req: Request, res: Response) {
       const activeDoc = docs.get(id) as Y.Doc | undefined;
       
       if (activeDoc) {
-        console.log(`[VERSION RESTORE] Updating in-memory Yjs document`);
-        
         // Clear the in-memory document and apply the restored state
         activeDoc.transact(() => {
           const shapesMap = activeDoc.getMap('shapes');
@@ -422,37 +400,28 @@ export async function restoreVersion(req: Request, res: Response) {
             shapesMap.set(shapeId, newShape);
           });
         });
-        
-        console.log(`[VERSION RESTORE] In-memory document updated - will broadcast to connected clients`);
-      } else {
-        console.log(`[VERSION RESTORE] No active in-memory document (no users connected)`);
       }
     } catch (error) {
       console.error(`[VERSION RESTORE] Failed to update in-memory document:`, error);
-      // Continue anyway - page reload will load from database
     }
 
     // Create a new version snapshot marking this restore point
-    // Include version number and label (if it has one)
-    
     // Get all versions to determine the version number (oldest = #1)
     const allVersions = await prisma.documentVersion.findMany({
       where: { documentId: id },
-      orderBy: { createdAt: 'asc' }, // Oldest first
+      orderBy: { createdAt: 'asc' },
       select: { id: true, label: true },
     });
     
     // Find the index of the version we're restoring from
     const versionIndex = allVersions.findIndex(v => v.id === versionId);
-    const versionNumber = versionIndex + 1; // Convert 0-based index to 1-based number
+    const versionNumber = versionIndex + 1;
     
     // Build the restore label
     let restoreLabel: string;
     if (versionData.label && !versionData.label.startsWith('Restored from')) {
-      // Has a custom label (and it's not another "Restored from" label)
       restoreLabel = `Restored from #${versionNumber} (${versionData.label})`;
     } else {
-      // No label or it's already a "Restored from" label - just use number and date
       const date = versionData.createdAt;
       const shortDate = date.toLocaleString('en-US', {
         month: 'short',
@@ -465,8 +434,6 @@ export async function restoreVersion(req: Request, res: Response) {
     }
     
     await saveVersion(id, versionDoc, restoreLabel);
-
-    console.log(`[VERSION RESTORE] Created restore point: "${restoreLabel}"`);
 
     res.json({ message: 'Version restored successfully' });
   } catch (error) {
@@ -514,25 +481,17 @@ export async function createVersionSnapshot(req: Request, res: Response) {
     // NO OWNERSHIP CHECK - any authenticated user can save versions
     // This allows collaborative editing without restrictions
 
-    console.log(`[VERSION SAVE] Document ${id}, Label: ${label || '(no label)'}`);
-
     let ydoc: Y.Doc;
     
     // PRIORITY 1: Use state from request body if provided (most up-to-date)
     if (yjsStateBase64) {
-      console.log(`[VERSION SAVE] Using state from request body`);
       const stateBuffer = Buffer.from(yjsStateBase64, 'base64');
-      console.log(`[VERSION SAVE] Request yjsState size: ${stateBuffer.length} bytes`);
-      
       ydoc = new Y.Doc();
       const state = new Uint8Array(stateBuffer);
       Y.applyUpdate(ydoc, state);
     } 
     // FALLBACK: Use database state (might be stale)
     else {
-      console.log(`[VERSION SAVE] WARNING: No state in request, using database (might be stale!)`);
-      console.log(`[VERSION SAVE] Database yjsState size: ${document.yjsState?.length || 0} bytes`);
-      
       ydoc = new Y.Doc();
       if (document.yjsState && document.yjsState.length > 0) {
         const state = new Uint8Array(document.yjsState);
@@ -540,14 +499,6 @@ export async function createVersionSnapshot(req: Request, res: Response) {
       }
     }
     
-    // DEBUG: Log shapes in the document
-    const shapesMap = ydoc.getMap('shapes');
-    console.log(`[VERSION SAVE] Shapes in version: ${shapesMap.size} shapes`);
-    shapesMap.forEach((shape, shapeId) => {
-      const shapeObj = shape as Y.Map<any>;
-      console.log(`[VERSION SAVE]   - Shape ${shapeId}: type=${shapeObj.get('type')}`);
-    });
-
     // Save version with optional label
     await saveVersion(id, ydoc, label);
 

@@ -293,12 +293,12 @@ describe('PR #6: Shape Movement', () => {
   })
   
   /**
-   * Test 8: Cannot move unselected shape
+   * Test 8: Dragging unselected shape selects AND moves it
    * 
-   * WHY: Only selected shapes should be moveable. This prevents
-   * accidental moves when user is interacting with other shapes.
+   * WHY: Modern design tools (like Figma) allow selecting and moving
+   * in one action for better UX. User doesn't need to click twice.
    */
-  test('Cannot move unselected shape', () => {
+  test('Dragging unselected shape selects and moves it', () => {
     render(<Canvas />)
     
     // Add a rectangle but DON'T select it
@@ -318,17 +318,20 @@ describe('PR #6: Shape Movement', () => {
     const initialX = initialShape.x
     const initialY = initialShape.y
     
-    // Try to drag (should not move because it's not selected)
+    // Drag the shape - should select AND move it in one action
     const rectElement = document.querySelector('rect[data-shape-id="test-rect-5"]')!
     fireEvent.mouseDown(rectElement, { clientX: 125, clientY: 125 })
     fireEvent.mouseMove(document, { clientX: 200, clientY: 200 })
     fireEvent.mouseUp(document)
     
-    // Since dragging an unselected shape should first SELECT it,
-    // the position should remain the same (no move yet)
+    // Shape should be selected
+    const selectedIds = useCanvasStore.getState().selectedIds
+    expect(selectedIds).toContain('test-rect-5')
+    
+    // Shape should have moved (select and move in one action)
     const shape = useCanvasStore.getState().shapes.get('test-rect-5')!
-    expect(shape.x).toBe(initialX)
-    expect(shape.y).toBe(initialY)
+    expect(shape.x).toBeGreaterThan(initialX)
+    expect(shape.y).toBeGreaterThan(initialY)
   })
 })
 

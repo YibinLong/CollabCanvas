@@ -69,6 +69,7 @@ interface CanvasStore {
   releaseAllLocks: (userId: string) => void
   
   // Alignment actions
+  _alignShapes: (edge: 'left' | 'right' | 'top' | 'bottom') => void
   alignLeft: () => void
   alignRight: () => void
   alignTop: () => void
@@ -672,39 +673,55 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
   },
   
   /**
-   * Align all selected shapes to the left (leftmost x)
+   * Align all selected shapes along an edge
    * 
-   * WHY: Alignment is essential in design tools (Figma-like).
-   * Helps users create precise layouts.
-   * 
-   * HOW: Find the leftmost x among selected shapes, then move
-   * all selected shapes to that x position.
+   * WHY: Consolidates common alignment logic for left/right/top/bottom.
+   * Reduces code duplication from ~100 lines to ~30 lines.
    */
-  alignLeft: () => {
+  _alignShapes: (edge: 'left' | 'right' | 'top' | 'bottom') => {
     set((state) => {
       if (state.selectedIds.length < 2) return state
       
-      // Find leftmost x
       const selectedShapes = state.selectedIds
         .map(id => state.shapes.get(id))
         .filter(Boolean) as Shape[]
       
       if (selectedShapes.length === 0) return state
       
-      const minX = Math.min(...selectedShapes.map(s => s.x))
+      // Calculate target position based on edge
+      let targetValue: number
+      if (edge === 'left') {
+        targetValue = Math.min(...selectedShapes.map(s => s.x))
+      } else if (edge === 'right') {
+        targetValue = Math.max(...selectedShapes.map(s => 
+          (s.type === 'rect' || s.type === 'circle' || s.type === 'text') ? s.x + s.width : s.x
+        ))
+      } else if (edge === 'top') {
+        targetValue = Math.min(...selectedShapes.map(s => s.y))
+      } else { // bottom
+        targetValue = Math.max(...selectedShapes.map(s => 
+          (s.type === 'rect' || s.type === 'circle' || s.type === 'text') ? s.y + s.height : s.y
+        ))
+      }
       
-      // Update all selected shapes to this x
-      const updates = state.selectedIds.map(id => ({
-        id,
-        updates: { x: minX }
-      }))
-      
+      // Update shapes
       const newShapes = new Map(state.shapes)
-      updates.forEach(({ id, updates: shapeUpdates }) => {
+      state.selectedIds.forEach(id => {
         const shape = newShapes.get(id)
-        if (shape) {
-          newShapes.set(id, { ...shape, ...shapeUpdates } as Shape)
+        if (!shape) return
+        
+        let update: Partial<Shape> = {}
+        if (edge === 'left') {
+          update = { x: targetValue }
+        } else if (edge === 'right' && (shape.type === 'rect' || shape.type === 'circle' || shape.type === 'text')) {
+          update = { x: targetValue - shape.width }
+        } else if (edge === 'top') {
+          update = { y: targetValue }
+        } else if (edge === 'bottom' && (shape.type === 'rect' || shape.type === 'circle' || shape.type === 'text')) {
+          update = { y: targetValue - shape.height }
         }
+        
+        newShapes.set(id, { ...shape, ...update } as Shape)
       })
       
       return { shapes: newShapes }
@@ -712,107 +729,35 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
   },
   
   /**
+   * Align all selected shapes to the left (leftmost x)
+   */
+  alignLeft: () => {
+    const state = get()
+    state._alignShapes('left')
+  },
+  
+  /**
    * Align all selected shapes to the right (rightmost right edge)
-   * 
-   * WHY: Align right lines up the right edges of shapes.
-   * 
-   * HOW: Find the rightmost right edge (x + width), then adjust
-   * each shape's x so its right edge aligns there.
    */
   alignRight: () => {
-    set((state) => {
-      if (state.selectedIds.length < 2) return state
-      
-      const selectedShapes = state.selectedIds
-        .map(id => state.shapes.get(id))
-        .filter(Boolean) as Shape[]
-      
-      if (selectedShapes.length === 0) return state
-      
-      // Find rightmost right edge
-      const maxRight = Math.max(...selectedShapes.map(s => {
-        if (s.type === 'rect' || s.type === 'circle' || s.type === 'text') {
-          return s.x + s.width
-        }
-        return s.x // Lines and others just use x
-      }))
-      
-      // Update all selected shapes
-      const newShapes = new Map(state.shapes)
-      state.selectedIds.forEach(id => {
-        const shape = newShapes.get(id)
-        if (shape) {
-          if (shape.type === 'rect' || shape.type === 'circle' || shape.type === 'text') {
-            newShapes.set(id, { ...shape, x: maxRight - shape.width } as Shape)
-          }
-        }
-      })
-      
-      return { shapes: newShapes }
-    })
+    const state = get()
+    state._alignShapes('right')
   },
   
   /**
    * Align all selected shapes to the top (topmost y)
    */
   alignTop: () => {
-    set((state) => {
-      if (state.selectedIds.length < 2) return state
-      
-      const selectedShapes = state.selectedIds
-        .map(id => state.shapes.get(id))
-        .filter(Boolean) as Shape[]
-      
-      if (selectedShapes.length === 0) return state
-      
-      const minY = Math.min(...selectedShapes.map(s => s.y))
-      
-      const newShapes = new Map(state.shapes)
-      state.selectedIds.forEach(id => {
-        const shape = newShapes.get(id)
-        if (shape) {
-          newShapes.set(id, { ...shape, y: minY } as Shape)
-        }
-      })
-      
-      return { shapes: newShapes }
-    })
+    const state = get()
+    state._alignShapes('top')
   },
   
   /**
    * Align all selected shapes to the bottom (bottommost bottom edge)
    */
   alignBottom: () => {
-    set((state) => {
-      if (state.selectedIds.length < 2) return state
-      
-      const selectedShapes = state.selectedIds
-        .map(id => state.shapes.get(id))
-        .filter(Boolean) as Shape[]
-      
-      if (selectedShapes.length === 0) return state
-      
-      // Find bottommost bottom edge
-      const maxBottom = Math.max(...selectedShapes.map(s => {
-        if (s.type === 'rect' || s.type === 'circle' || s.type === 'text') {
-          return s.y + s.height
-        }
-        return s.y
-      }))
-      
-      // Update all selected shapes
-      const newShapes = new Map(state.shapes)
-      state.selectedIds.forEach(id => {
-        const shape = newShapes.get(id)
-        if (shape) {
-          if (shape.type === 'rect' || shape.type === 'circle' || shape.type === 'text') {
-            newShapes.set(id, { ...shape, y: maxBottom - shape.height } as Shape)
-          }
-        }
-      })
-      
-      return { shapes: newShapes }
-    })
+    const state = get()
+    state._alignShapes('bottom')
   },
   
   /**

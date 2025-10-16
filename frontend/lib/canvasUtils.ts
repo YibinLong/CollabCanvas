@@ -192,8 +192,10 @@ export function getShapeCenter(shape: Shape): { x: number; y: number } {
     }
   }
   
-  // Fallback (should never happen)
-  return { x: shape.x, y: shape.y }
+  // TypeScript knows we've covered all shape types, so this should never execute
+  // The 'never' type assertion makes this explicit
+  const exhaustiveCheck: never = shape
+  throw new Error(`Unhandled shape type: ${(exhaustiveCheck as Shape).type}`)
 }
 
 /**

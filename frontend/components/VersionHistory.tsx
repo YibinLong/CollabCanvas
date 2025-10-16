@@ -316,7 +316,7 @@ export default function VersionHistory({ documentId, isOpen, onClose, onRestore,
         </div>
 
         {/* Save Version Button */}
-        <div className="px-4 py-3 border-b border-gray-700 space-y-2">
+        <div className="px-4 py-3 border-b border-gray-700">
           {!showLabelInput ? (
             <button
               onClick={() => {
@@ -380,35 +380,6 @@ export default function VersionHistory({ documentId, isOpen, onClose, onRestore,
               </div>
             </div>
           )}
-
-          {/* Delete All History Button - Changes to red "Confirm Delete?" on first click */}
-          <button
-            onClick={handleDeleteAllClick}
-            disabled={clearing || versions.length === 0}
-            className={`w-full px-3 py-2 disabled:bg-gray-800 disabled:text-gray-500 text-white text-sm font-medium rounded transition-colors flex items-center justify-center gap-2 ${
-              confirmDelete
-                ? 'bg-red-600 hover:bg-red-700'
-                : 'bg-gray-700 hover:bg-gray-600'
-            }`}
-          >
-            {clearing ? (
-              'Deleting...'
-            ) : confirmDelete ? (
-              <>
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                </svg>
-                Confirm Delete?
-              </>
-            ) : (
-              <>
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                </svg>
-                Delete All History
-              </>
-            )}
-          </button>
         </div>
 
         {/* Error Message */}
@@ -530,11 +501,47 @@ export default function VersionHistory({ documentId, isOpen, onClose, onRestore,
           )}
         </div>
 
-        {/* Footer Info */}
-        <div className="px-4 py-2 border-t border-gray-700 bg-gray-850">
-          <p className="text-gray-500 text-xs text-center">
-            Up to 50 versions are kept automatically
-          </p>
+        {/* Footer - Info and Delete All Button */}
+        <div className="border-t border-gray-700 bg-gray-850">
+          <div className="px-4 py-2">
+            <p className="text-gray-500 text-xs text-center">
+              Up to 50 versions are kept automatically
+            </p>
+          </div>
+          
+          {/* Delete All History Button - Moved to bottom for safety
+              WHY: Separated from the Save button to prevent accidental clicks.
+              Users who want to save won't accidentally delete their history.
+          */}
+          <div className="px-4 pb-3">
+            <button
+              onClick={handleDeleteAllClick}
+              disabled={clearing || versions.length === 0}
+              className={`w-full px-3 py-2 disabled:bg-gray-800 disabled:text-gray-500 text-white text-xs font-medium rounded transition-colors flex items-center justify-center gap-2 ${
+                confirmDelete
+                  ? 'bg-red-600 hover:bg-red-700'
+                  : 'bg-gray-700 hover:bg-gray-600'
+              }`}
+            >
+              {clearing ? (
+                'Deleting...'
+              ) : confirmDelete ? (
+                <>
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                  </svg>
+                  Confirm Delete?
+                </>
+              ) : (
+                <>
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                  </svg>
+                  Delete All History
+                </>
+              )}
+            </button>
+          </div>
         </div>
       </div>
     </>

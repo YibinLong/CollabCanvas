@@ -47,27 +47,48 @@ export default function Toolbar({ documentId, onClearAll }: ToolbarProps) {
   const setCurrentTool = useCanvasStore((state) => state.setCurrentTool)
   const [isClearing, setIsClearing] = useState(false)
   
+  /**
+   * WHY: Track confirmation state for the Clear All button.
+   * This creates a two-step process:
+   * 1st click: Button changes to red "Confirm Delete?" 
+   * 2nd click: Actually clears all shapes
+   */
+  const [confirmClear, setConfirmClear] = useState(false)
+  
   const handleToolClick = (tool: Tool) => {
+    // Clear any pending confirmation when switching tools
+    // WHY: If user clicks another tool, they've changed their mind about clearing
+    setConfirmClear(false)
+    
     // Update the global store - Canvas will react to this change
     setCurrentTool(tool)
   }
   
   /**
-   * Handle Clear All Shapes
+   * Handle Clear All Shapes - Two-Click Confirmation Pattern
    * 
    * WHY: User clicks the trash button to delete all shapes at once.
-   * We need to confirm before doing this destructive action.
+   * This is destructive so we use a two-step confirmation.
    * 
-   * HOW: Show confirmation dialog, then call the parent's onClearAll callback
-   * which will handle the API call and Yjs sync.
+   * HOW IT WORKS:
+   * - First click: Button turns red "Confirm Delete?" → sets confirmClear to true
+   * - Second click: Actually clears all shapes → calls onClearAll callback
+   * - Clicking other tools cancels the confirmation
+   * 
+   * WHAT IT DOES:
+   * 1. Calls the parent's onClearAll callback
+   * 2. Parent (Canvas) handles the API call and Yjs sync
+   * 3. All connected users see shapes removed in real-time
    */
   const handleClearAll = async () => {
-    // Confirm before clearing (this is destructive!)
-    const confirmed = window.confirm(
-      'Are you sure you want to delete ALL shapes? This action cannot be undone and will affect all users viewing this document.'
-    )
+    // If NOT in confirmation state, enter confirmation mode
+    if (!confirmClear) {
+      setConfirmClear(true)
+      return
+    }
     
-    if (!confirmed) return
+    // If we're here, user clicked "Confirm Delete?" - actually clear now
+    setConfirmClear(false) // Reset confirmation state
     
     if (onClearAll) {
       setIsClearing(true)
@@ -146,38 +167,79 @@ export default function Toolbar({ documentId, onClearAll }: ToolbarProps) {
       {/* Divider before destructive action */}
       <div className="w-px bg-gray-300" />
       
-      {/* Clear All Shapes Button 
+      {/* Clear All Shapes Button - Two-Click Confirmation
           WHY: Allows users to delete all shapes at once from the canvas.
-          This is a destructive action so we:
-          1. Show it in red to indicate danger
-          2. Require confirmation before executing
-          3. Disable it while the operation is in progress
+          This is a destructive action so we use two-click confirmation:
+          1. First click: Button turns red "Confirm Delete?" with warning icon
+          2. Second click: Actually clears all shapes
+          3. Clicking other tools cancels the confirmation
+          4. Disabled while operation is in progress
       */}
       <button
         onClick={handleClearAll}
         disabled={isClearing || !onClearAll}
-        className={`px-4 py-2 rounded transition-colors ${
+        className={`px-4 py-2 rounded transition-colors flex items-center gap-1.5 ${
           isClearing || !onClearAll
             ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
+            : confirmClear
+            ? 'bg-red-600 text-white hover:bg-red-700'
             : 'bg-red-50 text-red-600 hover:bg-red-100'
         }`}
-        title="Clear All Shapes (Delete Everything)"
+        title={confirmClear ? 'Click again to confirm deletion' : 'Clear All Shapes (Delete Everything)'}
       >
-        <svg 
-          width="20" 
-          height="20" 
-          viewBox="0 0 20 20" 
-          fill="none" 
-          stroke="currentColor" 
-          strokeWidth="2"
-        >
-          {/* Trash can icon */}
-          <path d="M3 5 L17 5" />
-          <path d="M8 5 L8 3 L12 3 L12 5" />
-          <path d="M5 5 L5 17 C5 17.5 5.5 18 6 18 L14 18 C14.5 18 15 17.5 15 17 L15 5" />
-          <path d="M8 8 L8 15" />
-          <path d="M12 8 L12 15" />
-        </svg>
+        {isClearing ? (
+          // Loading state
+          <svg 
+            className="animate-spin"
+            width="20" 
+            height="20" 
+            viewBox="0 0 20 20" 
+            fill="none" 
+            stroke="currentColor" 
+            strokeWidth="2"
+          >
+            <circle cx="10" cy="10" r="7" strokeDasharray="32" strokeDashoffset="8" />
+          </svg>
+        ) : confirmClear ? (
+          // Confirmation state - Warning icon (high quality triangle with exclamation)
+          <>
+            <svg 
+              width="20" 
+              height="20" 
+              viewBox="0 0 24 24" 
+              fill="none" 
+              stroke="currentColor" 
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              {/* Triangle outline */}
+              <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+              {/* Exclamation mark - line */}
+              <line x1="12" y1="9" x2="12" y2="13" />
+              {/* Exclamation mark - dot */}
+              <line x1="12" y1="17" x2="12.01" y2="17" />
+            </svg>
+            <span className="text-xs font-medium">Confirm?</span>
+          </>
+        ) : (
+          // Normal state - Trash icon
+          <svg 
+            width="20" 
+            height="20" 
+            viewBox="0 0 20 20" 
+            fill="none" 
+            stroke="currentColor" 
+            strokeWidth="2"
+          >
+            {/* Trash can icon */}
+            <path d="M3 5 L17 5" />
+            <path d="M8 5 L8 3 L12 3 L12 5" />
+            <path d="M5 5 L5 17 C5 17.5 5.5 18 6 18 L14 18 C14.5 18 15 17.5 15 17 L15 5" />
+            <path d="M8 8 L8 15" />
+            <path d="M12 8 L12 15" />
+          </svg>
+        )}
       </button>
     </div>
   )

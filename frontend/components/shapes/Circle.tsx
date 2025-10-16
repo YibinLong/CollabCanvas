@@ -48,7 +48,15 @@ export default function Circle({ shape, isSelected, onClick, onMouseDown, onCont
   const radius = Math.min(shape.width, shape.height) / 2
   
   return (
-    <>
+    <g
+      // Apply rotation to the entire group (bounding box + circle)
+      // WHY: When circle is rotated, the dotted bounding box should rotate too
+      transform={
+        shape.rotation
+          ? `rotate(${shape.rotation} ${centerX} ${centerY})`
+          : undefined
+      }
+    >
       {/* Show bounding box only when selected (not while creating)
           WHY: Shows the bounding box for reference when shape is selected */}
       {isSelected && (
@@ -75,13 +83,6 @@ export default function Circle({ shape, isSelected, onClick, onMouseDown, onCont
         // Visual styling
         fill={shape.color || '#cccccc'}
         
-        // Apply rotation if specified (rotates around the center of the bounding box)
-        transform={
-          shape.rotation
-            ? `rotate(${shape.rotation} ${centerX} ${centerY})`
-            : undefined
-        }
-        
         // Selection indicator - blue stroke around the circle itself
         stroke={isSelected ? '#0066ff' : 'none'}
         strokeWidth={isSelected ? 2 : 0}
@@ -98,7 +99,7 @@ export default function Circle({ shape, isSelected, onClick, onMouseDown, onCont
         data-shape-id={shape.id}
         data-shape-type="circle"
       />
-    </>
+    </g>
   )
 }
 

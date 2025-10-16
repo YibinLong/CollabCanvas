@@ -30,6 +30,7 @@ import Circle from './shapes/Circle'
 import Line from './shapes/Line'
 import Text from './shapes/Text'
 import ResizeHandles, { type HandlePosition } from './ResizeHandles'
+import RotationHandle from './RotationHandle'
 import CursorOverlay from './CursorOverlay'
 import AlignmentToolbar from './AlignmentToolbar'
 import PropertiesPanel from './PropertiesPanel'
@@ -37,7 +38,8 @@ import ContextMenu from './ContextMenu'
 import type { Shape } from '@/types/canvas'
 
 // Interaction modes
-type InteractionMode = 'none' | 'panning' | 'creating' | 'moving' | 'resizing'
+// WHY: Added 'rotating' mode for when user drags the rotation handle
+type InteractionMode = 'none' | 'panning' | 'creating' | 'moving' | 'resizing' | 'rotating'
 
 /**
  * Generate a unique ID for shapes
@@ -205,6 +207,10 @@ export default function Canvas({ provider, users, updateCursor, currentUser }: C
   // Track if mouse is currently over the canvas
   const [isMouseOverCanvas, setIsMouseOverCanvas] = useState(false)
   
+  // Track which text shape is currently being edited
+  // WHY: When editing text, we need to remove rotation from handles so they align with the upright text box
+  const [editingTextId, setEditingTextId] = useState<string | null>(null)
+  
   // Context menu state
   // WHY: Track whether the context menu is open, its position, and which shape it's for
   const [contextMenu, setContextMenu] = useState<{
@@ -244,6 +250,7 @@ export default function Canvas({ provider, users, updateCursor, currentUser }: C
     creatingShapeId?: string
     justFinishedDrag?: boolean
     wasCancelled?: boolean
+    initialRotation?: number // For rotation mode - tracks starting rotation angle
   }>({
     startX: 0,
     startY: 0,
@@ -680,6 +687,55 @@ export default function Canvas({ provider, users, updateCursor, currentUser }: C
           }
         }
         break
+        
+      case 'rotating':
+        // Update rotation of shape being rotated
+        // WHY: Calculate the angle based on mouse position relative to shape center
+        // HOW: Use atan2 to get angles from center to start and current positions,
+        // then find the difference and add it to the initial rotation
+        
+        if (!interactionStateRef.current.shapeId || !interactionStateRef.current.initialShape) break
+        
+        const rotatingShape = interactionStateRef.current.initialShape
+        
+        // Calculate the center of the shape (rotation origin)
+        let centerX: number, centerY: number
+        
+        if (rotatingShape.type === 'rect' || rotatingShape.type === 'circle' || rotatingShape.type === 'text') {
+          // For shapes with width/height, center is x + width/2, y + height/2
+          centerX = rotatingShape.x + rotatingShape.width / 2
+          centerY = rotatingShape.y + rotatingShape.height / 2
+        } else if (rotatingShape.type === 'line') {
+          // For lines, center is midpoint between start and end
+          centerX = (rotatingShape.x + rotatingShape.x2) / 2
+          centerY = (rotatingShape.y + rotatingShape.y2) / 2
+        } else {
+          break
+        }
+        
+        // Calculate angle from center to initial mouse position
+        const startAngle = Math.atan2(
+          interactionStateRef.current.startY - centerY,
+          interactionStateRef.current.startX - centerX
+        )
+        
+        // Calculate angle from center to current mouse position
+        const currentAngle = Math.atan2(
+          svgCoords.y - centerY,
+          svgCoords.x - centerX
+        )
+        
+        // Calculate the rotation delta (in radians) and convert to degrees
+        const angleDelta = (currentAngle - startAngle) * (180 / Math.PI)
+        
+        // Apply the delta to the initial rotation
+        const newRotation = (interactionStateRef.current.initialRotation || 0) + angleDelta
+        
+        // Update the shape's rotation
+        updateShape(interactionStateRef.current.shapeId, {
+          rotation: newRotation
+        })
+        break
     }
   }
   
@@ -697,6 +753,7 @@ export default function Canvas({ provider, users, updateCursor, currentUser }: C
     const wasDragging = interactionMode === 'creating' ||
                         interactionMode === 'moving' ||
                         interactionMode === 'resizing' ||
+                        interactionMode === 'rotating' ||
                         interactionMode === 'panning'
 
     if (interactionMode === 'creating') {
@@ -767,10 +824,10 @@ export default function Canvas({ provider, users, updateCursor, currentUser }: C
       }
     }
     
-    // Release locks when finishing moving or resizing
+    // Release locks when finishing moving, resizing, or rotating
     // WHY: After user finishes interacting with shapes, unlock them
     // so they can be edited by others (in multiplayer) or deleted
-    if (interactionMode === 'moving' || interactionMode === 'resizing') {
+    if (interactionMode === 'moving' || interactionMode === 'resizing' || interactionMode === 'rotating') {
       // Unlock all currently selected shapes that were being moved
       if (interactionMode === 'moving' && interactionStateRef.current.initialShapes) {
         // Moving multiple shapes - unlock all of them
@@ -778,7 +835,7 @@ export default function Canvas({ provider, users, updateCursor, currentUser }: C
           unlockShape(id)
         })
       } else if (interactionStateRef.current.shapeId) {
-        // Resizing or moving single shape - unlock it
+        // Resizing, rotating, or moving single shape - unlock it
         unlockShape(interactionStateRef.current.shapeId)
       }
       
@@ -906,6 +963,46 @@ export default function Canvas({ provider, users, updateCursor, currentUser }: C
       shapeId,
       initialShape: { ...shape },
       handlePosition: position,
+    }
+  }
+  
+  /**
+   * Handle rotation start
+   * 
+   * WHY: When user grabs the rotation handle, we need to enter rotation mode.
+   * We track the initial mouse position and the shape's current rotation.
+   * 
+   * HOW: 
+   * - Lock the shape (prevent other users from editing it)
+   * - Store initial mouse position in SVG coordinates
+   * - Store the shape's current rotation (or 0 if not rotated yet)
+   * - Enter 'rotating' interaction mode
+   */
+  const handleRotationStart = (shapeId: string, e: React.MouseEvent) => {
+    e.stopPropagation()
+    
+    const shape = shapes.get(shapeId)
+    if (!shape) return
+    
+    // Check if shape is locked by another user
+    if (isShapeLocked(shapeId, currentUser.id)) {
+      console.log(`Shape is currently being edited by another user`)
+      return
+    }
+    
+    // Acquire lock before rotating
+    lockShape(shapeId, currentUser.id)
+    
+    const svgCoords = screenToSVG(e.clientX, e.clientY)
+    setInteractionMode('rotating')
+    interactionStateRef.current = {
+      startX: svgCoords.x,
+      startY: svgCoords.y,
+      lastX: svgCoords.x,
+      lastY: svgCoords.y,
+      shapeId,
+      initialShape: { ...shape },
+      initialRotation: shape.rotation || 0, // Store current rotation
     }
   }
   
@@ -1414,6 +1511,11 @@ export default function Canvas({ provider, users, updateCursor, currentUser }: C
               // Update the text content when user edits it
               updateShape(shape.id, { text: newText })
             }}
+            onEditingChange={(isEditing) => {
+              // Track when text is being edited
+              // WHY: We need to know this so we can adjust handle rotation
+              setEditingTextId(isEditing ? shape.id : null)
+            }}
           />
         )
         break
@@ -1425,10 +1527,56 @@ export default function Canvas({ provider, users, updateCursor, currentUser }: C
       <g key={shape.id}>
         {shapeElement}
         {isSelected && !isLockedByOther && (
-          <ResizeHandles
-            shape={shape}
-            onResizeStart={(position, e) => handleResizeStart(shape.id, position, e)}
-          />
+          <>
+            {/* Resize handles and rotation handle need to rotate with the shape
+                WHY: When shape is rotated, the handles should follow the rotation
+                so users can intuitively resize/rotate in the shape's local space
+                EXCEPTION: When text is being edited, don't rotate handles because
+                the text box itself becomes upright for editing */}
+            <g
+              transform={
+                // Don't rotate handles if this text is being edited
+                (shape.rotation && !(shape.type === 'text' && editingTextId === shape.id))
+                  ? (() => {
+                      // Calculate center point for rotation based on shape type
+                      let centerX: number
+                      let centerY: number
+                      
+                      if (shape.type === 'rect') {
+                        centerX = shape.x + shape.width / 2
+                        centerY = shape.y + shape.height / 2
+                      } else if (shape.type === 'circle') {
+                        centerX = shape.x + shape.width / 2
+                        centerY = shape.y + shape.height / 2
+                      } else if (shape.type === 'text') {
+                        centerX = shape.x + shape.width / 2
+                        centerY = shape.y + shape.height / 2
+                      } else {
+                        // Line type
+                        centerX = (shape.x + shape.x2) / 2
+                        centerY = (shape.y + shape.y2) / 2
+                      }
+                      return `rotate(${shape.rotation} ${centerX} ${centerY})`
+                    })()
+                  : undefined
+              }
+            >
+              {/* Resize handles - corners and edges for resizing */}
+              <ResizeHandles
+                shape={shape}
+                onResizeStart={(position, e) => handleResizeStart(shape.id, position, e)}
+              />
+              {/* Rotation handle - appears above the shape for rotation
+                  WHY: Only show rotation for rectangles and text boxes
+                  Circles look the same at any rotation, and lines are better manipulated by endpoints */}
+              {(shape.type === 'rect' || shape.type === 'text') && (
+                <RotationHandle
+                  shape={shape}
+                  onRotationStart={(e) => handleRotationStart(shape.id, e)}
+                />
+              )}
+            </g>
+          </>
         )}
         {/* Visual indicator for locked shapes */}
         {isLockedByOther && (
@@ -1492,6 +1640,9 @@ export default function Canvas({ provider, users, updateCursor, currentUser }: C
     cursorStyle = 'crosshair'
   } else if (interactionMode === 'moving') {
     cursorStyle = 'move'
+  } else if (interactionMode === 'rotating') {
+    // Show grabbing cursor during rotation
+    cursorStyle = 'grabbing'
   }
   
   return (

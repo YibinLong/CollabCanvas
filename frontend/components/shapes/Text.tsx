@@ -25,6 +25,7 @@ interface TextProps {
   onMouseDown?: (e: React.MouseEvent) => void
   onContextMenu?: (e: React.MouseEvent) => void
   onTextChange?: (newText: string) => void
+  onEditingChange?: (isEditing: boolean) => void // Notify parent when editing state changes
 }
 
 /**
@@ -36,7 +37,7 @@ interface TextProps {
  * @param onContextMenu - Handler for when user right-clicks this shape
  * @param onTextChange - Handler for when text content is edited
  */
-export default function Text({ shape, isSelected, onClick, onMouseDown, onContextMenu, onTextChange }: TextProps) {
+export default function Text({ shape, isSelected, onClick, onMouseDown, onContextMenu, onTextChange, onEditingChange }: TextProps) {
   // Track if we're currently editing this text
   const [isEditing, setIsEditing] = useState(false)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
@@ -48,6 +49,10 @@ export default function Text({ shape, isSelected, onClick, onMouseDown, onContex
   const handleDoubleClick = (e: React.MouseEvent) => {
     e.stopPropagation()
     setIsEditing(true)
+    // Notify parent that editing has started
+    if (onEditingChange) {
+      onEditingChange(true)
+    }
   }
   
   /**
@@ -77,12 +82,39 @@ export default function Text({ shape, isSelected, onClick, onMouseDown, onContex
    */
   const handleBlur = () => {
     setIsEditing(false)
+    // Notify parent that editing has ended
+    if (onEditingChange) {
+      onEditingChange(false)
+    }
   }
   
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    // Escape key - exit editing without saving
     if (e.key === 'Escape') {
       setIsEditing(false)
+      // Notify parent that editing has ended
+      if (onEditingChange) {
+        onEditingChange(false)
+      }
     }
+    
+    // Enter key - accept changes and exit editing
+    // WHY: In design tools like Figma, pressing Enter confirms text changes
+    // Shift+Enter is used to create new lines within the text
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault() // Prevent default Enter behavior (which would add a newline)
+      setIsEditing(false)
+      // Notify parent that editing has ended
+      if (onEditingChange) {
+        onEditingChange(false)
+      }
+    }
+    
+    // Shift+Enter - insert a newline
+    // WHY: Allow users to create multi-line text
+    // The default textarea behavior handles this automatically when we don't preventDefault
+    // So we don't need to do anything special here, just let it through
+    
     // Prevent event from bubbling up (so it doesn't trigger canvas shortcuts)
     e.stopPropagation()
   }
@@ -132,11 +164,23 @@ export default function Text({ shape, isSelected, onClick, onMouseDown, onContex
   // When not editing, use foreignObject with a div for proper text wrapping
   // WHY: SVG <text> elements don't support automatic text wrapping
   // Using foreignObject + div gives us proper word wrapping like HTML
+  
+  // Calculate center point for rotation
+  // WHY: Text rotates around its center point, not top-left corner
+  const centerX = shape.x + shape.width / 2
+  const centerY = shape.y + shape.height / 2
+  
   return (
     <g 
       data-shape-id={shape.id}
       data-shape-type="text"
       onDoubleClick={handleDoubleClick}
+      // Apply rotation if specified (rotates around center of text box)
+      transform={
+        shape.rotation
+          ? `rotate(${shape.rotation} ${centerX} ${centerY})`
+          : undefined
+      }
     >
       {/* Text box border - shows the bounds of the text area */}
       <rect

@@ -38,6 +38,23 @@ This document provides a guide to all documentation in the CollabCanvas project.
 - **[ARCHITECTURE.md](architecture/ARCHITECTURE.md)** - System architecture overview
 - **[PROJECT_STRUCTURE.txt](architecture/PROJECT_STRUCTURE.txt)** - Project directory structure
 
+### `/docs/performance/` - Performance Optimization
+- **[README.md](performance/README.md)** - Performance attempts overview
+- **[PERFORMANCE_ATTEMPT_POSTMORTEM.md](performance/PERFORMANCE_ATTEMPT_POSTMORTEM.md)** - Failed 60fps optimization attempt (Oct 2025)
+- **[PERFORMANCE_CODE_DIFF.md](performance/PERFORMANCE_CODE_DIFF.md)** - Exact code changes attempted
+- **[PERFORMANCE_NOTES.md](performance/PERFORMANCE_NOTES.md)** - Planning notes and ideas
+
+### `/docs/features/` - Feature Documentation
+- **[Z_INDEX_FEATURE.md](features/Z_INDEX_FEATURE.md)** - Z-index management feature
+- **[PHASE6_FEATURES_PLAN.md](features/PHASE6_FEATURES_PLAN.md)** - Planned features for Phase 6
+
+### `/docs/project-organization/` - Project Meta Documentation
+- **[FILE_ORGANIZATION.md](project-organization/FILE_ORGANIZATION.md)** - File organization guidelines
+- **[CLEANUP_COMPLETE.md](project-organization/CLEANUP_COMPLETE.md)** - Project cleanup summary
+- **[CONFLICT_RESOLUTION.md](project-organization/CONFLICT_RESOLUTION.md)** - Conflict resolution documentation
+- **[ORGANIZATION_SUMMARY.md](project-organization/ORGANIZATION_SUMMARY.md)** - Project organization summary
+- **[PR_DOCUMENTATION_STANDARD.md](project-organization/PR_DOCUMENTATION_STANDARD.md)** - PR documentation standards
+
 ### `/docs/pr-completions/` - PR Completion Reports
 Organized by phase and PR number, containing detailed completion documentation for each pull request.
 

@@ -175,6 +175,17 @@ See [Setup Database Guide](./docs/guides/SETUP_DATABASE.md) and [Quick Start Gui
 
 For detailed implementation and testing instructions, see [Conflict Resolution Documentation](./docs/CONFLICT_RESOLUTION.md).
 
+## 📏 Canvas Grid System
+
+The canvas uses a coordinate system for precise shape placement:
+
+- **Grid Size:** Each grid square is **50×50 pixels**
+- **Canvas Dimensions:** 8000px wide × 6000px tall
+- **Origin (0,0):** Top-left corner of the canvas
+- **Starting View:** Users start centered at approximately (4000, 3000)
+
+When using the AI Assistant or placing shapes manually, coordinates are in pixels. For example, a 300×300 rectangle spans 6 grid squares in each direction.
+
 ## 📖 Documentation
 
 ### Essential Docs

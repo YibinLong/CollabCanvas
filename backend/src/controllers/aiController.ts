@@ -363,7 +363,7 @@ export const interpret = async (req: Request, res: Response) => {
     console.log(`AI Request: "${prompt}" (document: ${documentId}, user: ${userId || 'anonymous'})`);
 
     const completion = await openai.chat.completions.create({
-      model: 'gpt-4-turbo-preview', // Fast and good at function calling
+      model: 'gpt-4o-mini', // Fast and good at function calling
       messages: [
         {
           role: 'system',

@@ -14,11 +14,11 @@ async function checkCanvasState() {
     console.log('🔍 Checking canvas state in database...\n')
 
     const document = await prisma.document.findUnique({
-      where: { id: 'test-document-123' }
+      where: { id: 'GLOBAL_CANVAS' }
     })
 
     if (!document) {
-      console.log('❌ Document "test-document-123" not found!')
+      console.log('❌ Document "GLOBAL_CANVAS" not found!')
       console.log('💡 Run: npm run create-shared-canvas')
       process.exit(1)
     }

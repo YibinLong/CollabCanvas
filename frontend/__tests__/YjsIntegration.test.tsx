@@ -217,13 +217,13 @@ describe('PR #10: Yjs Integration Tests (TDD - Write Tests First)', () => {
       // In real implementation, this would be: new WebsocketProvider(url, room, doc)
       const provider = new MockWebSocketProvider(
         'ws://localhost:4000',
-        'test-document-123',
+        'GLOBAL_CANVAS',
         doc
       )
       
       // EXPECT: Provider should be created with correct config
       expect(provider.url).toBe('ws://localhost:4000')
-      expect(provider.roomName).toBe('test-document-123')
+      expect(provider.roomName).toBe('GLOBAL_CANVAS')
       expect(provider.doc).toBe(doc)
       expect(provider.connected).toBe(false)
     })
@@ -232,7 +232,7 @@ describe('PR #10: Yjs Integration Tests (TDD - Write Tests First)', () => {
       const doc = createTestYDoc()
       const provider = new MockWebSocketProvider(
         'ws://localhost:4000',
-        'test-document-123',
+        'GLOBAL_CANVAS',
         doc
       )
       
@@ -247,7 +247,7 @@ describe('PR #10: Yjs Integration Tests (TDD - Write Tests First)', () => {
       const doc = createTestYDoc()
       const provider = new MockWebSocketProvider(
         'ws://localhost:4000',
-        'test-document-123',
+        'GLOBAL_CANVAS',
         doc
       )
       

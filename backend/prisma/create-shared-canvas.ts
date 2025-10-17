@@ -1,7 +1,7 @@
 /**
  * Create Shared Canvas Document
  * 
- * WHY: The frontend uses a hardcoded document ID "test-document-123" for a shared canvas
+ * WHY: The frontend uses a hardcoded document ID "GLOBAL_CANVAS" for a shared canvas
  * where all users collaborate together. This script creates that document in the database.
  * 
  * RUN THIS ONCE to set up the shared canvas.
@@ -28,11 +28,11 @@ async function createSharedCanvas() {
 
     // Check if document already exists
     const existing = await prisma.document.findUnique({
-      where: { id: 'test-document-123' }
+      where: { id: 'GLOBAL_CANVAS' }
     })
 
     if (existing) {
-      console.log('✅ Document "test-document-123" already exists!')
+      console.log('✅ Document "GLOBAL_CANVAS" already exists!')
       console.log(`   Title: ${existing.title}`)
       console.log(`   Owner: ${existing.ownerId}`)
       console.log(`   Has state: ${existing.yjsState ? 'Yes' : 'No'}`)
@@ -42,8 +42,8 @@ async function createSharedCanvas() {
     // Create the shared canvas document
     const document = await prisma.document.create({
       data: {
-        id: 'test-document-123', // Hardcoded ID to match frontend
-        title: 'Shared Canvas (All Users)',
+        id: 'GLOBAL_CANVAS', // Hardcoded ID to match frontend
+        title: 'Global Canvas (All Users)',
         ownerId: firstUser.id,
         yjsState: null, // Will be populated when users start drawing
       }

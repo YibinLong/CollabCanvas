@@ -45,8 +45,11 @@ export default function Home() {
    * 
    * NOTE: These hooks must be called unconditionally (React rules)
    * even if user is not logged in yet. The hooks handle null user gracefully.
+   * 
+   * GLOBAL_CANVAS: All users (new and existing) connect to the same shared canvas.
+   * This creates a collaborative workspace where everyone can see and edit together.
    */
-  const documentId = 'test-document-123'
+  const documentId = 'GLOBAL_CANVAS'
   const { connected, status, provider } = useYjsSync(documentId, undefined, !!user)
   
   // Create currentUser object from authenticated user

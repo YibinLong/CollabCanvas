@@ -17,6 +17,7 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { useAuth } from '../lib/AuthContext';
+import { useCanvasStore } from '../lib/canvasStore';
 
 interface AIChatMessage {
   id: string;
@@ -32,13 +33,14 @@ interface AIAssistantProps {
 
 export default function AIAssistant({ documentId, onCommandExecuted }: AIAssistantProps) {
   const { user, session } = useAuth();
+  const selectedIds = useCanvasStore((state) => state.selectedIds);
   const [isOpen, setIsOpen] = useState(false);
   const [prompt, setPrompt] = useState('');
   const [messages, setMessages] = useState<AIChatMessage[]>([
     {
       id: 'welcome',
       role: 'system',
-      content: '👋 Hi! I can help you create and modify shapes. Try: "create a red rectangle" or "arrange shapes in a grid"',
+      content: '👋 Hi! I can help you create and modify shapes.\n\nCreate: "create a red rectangle at 200, 200"\nModify selected: "change color to blue" or "move to 500, 500"\nArrange: "arrange shapes in a grid"',
       timestamp: Date.now(),
     },
   ]);
@@ -111,6 +113,7 @@ export default function AIAssistant({ documentId, onCommandExecuted }: AIAssista
           prompt: userMessage.content,
           documentId: documentId,
           userId: user?.id,
+          selectedShapeIds: selectedIds,
         }),
       });
 

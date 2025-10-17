@@ -31,7 +31,7 @@ import { getYjsDocumentForRoom } from '../services/websocketServer';
  */
 export const executeCommand = async (req: Request, res: Response) => {
   try {
-    const { prompt, documentId, userId } = req.body;
+    const { prompt, documentId, userId, selectedShapeIds } = req.body;
 
     // Validation
     if (!prompt || typeof prompt !== 'string' || prompt.trim().length === 0) {
@@ -49,7 +49,7 @@ export const executeCommand = async (req: Request, res: Response) => {
     }
 
     // Step 1: Interpret the prompt using OpenAI
-    const interpretRequest = { body: { prompt, documentId, userId }, params: {} } as Request;
+    const interpretRequest = { body: { prompt, documentId, userId, selectedShapeIds }, params: {} } as Request;
     const interpretResponse = {
       status: (code: number) => ({
         json: (data: any) => data,

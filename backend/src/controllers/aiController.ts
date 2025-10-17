@@ -330,7 +330,7 @@ export const interpret = async (req: Request, res: Response) => {
   const startTime = Date.now();
 
   try {
-    const { prompt, documentId, userId } = req.body;
+    const { prompt, documentId, userId, selectedShapeIds } = req.body;
 
     // ==================== Validation ====================
     if (!prompt || typeof prompt !== 'string' || prompt.trim().length === 0) {
@@ -347,6 +347,9 @@ export const interpret = async (req: Request, res: Response) => {
       });
     }
 
+    // Normalize selectedShapeIds to array
+    const selectedIds: string[] = Array.isArray(selectedShapeIds) ? selectedShapeIds : [];
+
     // Check for ambiguous/unhelpful prompts
     const trimmedPrompt = prompt.trim().toLowerCase();
     const tooVague = ['do something', 'help', 'hi', 'hello', 'test'].includes(trimmedPrompt);
@@ -359,8 +362,48 @@ export const interpret = async (req: Request, res: Response) => {
       });
     }
 
+    // ==================== Check if command requires selection ====================
+    const manipulationKeywords = [
+      'move', 'resize', 'rotate', 'change color', 'color', 'delete', 'remove',
+      'arrange', 'align', 'duplicate', 'copy'
+    ];
+    
+    const isManipulationCommand = manipulationKeywords.some(keyword => 
+      trimmedPrompt.includes(keyword)
+    );
+    
+    const isCreationCommand = trimmedPrompt.includes('create') || 
+                             trimmedPrompt.includes('add') || 
+                             trimmedPrompt.includes('draw') ||
+                             trimmedPrompt.includes('make') ||
+                             trimmedPrompt.includes('grid') ||
+                             trimmedPrompt.includes('button') ||
+                             trimmedPrompt.includes('card') ||
+                             trimmedPrompt.includes('form') ||
+                             trimmedPrompt.includes('navbar');
+
+    // If it's a manipulation command and no shapes are selected, return helpful error
+    if (isManipulationCommand && !isCreationCommand && selectedIds.length === 0) {
+      return res.status(200).json({
+        success: false,
+        commands: [],
+        error: 'Please select shapes first, then try again. Click on shapes to select them before using commands like "move", "change color", "arrange", etc.',
+      });
+    }
+
     // ==================== Call OpenAI API ====================
-    console.log(`AI Request: "${prompt}" (document: ${documentId}, user: ${userId || 'anonymous'})`);
+    console.log(`AI Request: "${prompt}" (document: ${documentId}, user: ${userId || 'anonymous'}, selected: ${selectedIds.length} shape(s))`);
+
+    // Build context about selected shapes for the system prompt
+    const selectionContext = selectedIds.length > 0 
+      ? `\n\nIMPORTANT: The user has ${selectedIds.length} shape(s) currently selected with IDs: [${selectedIds.join(', ')}].
+When the user gives manipulation commands (move, resize, rotate, change color, delete, arrange, align, duplicate) WITHOUT explicitly creating new shapes, they are referring to these selected shapes.
+- Use "selected" as the shapeId/shapeIds parameter for commands that modify existing shapes
+- DO NOT use "selected" for createShape commands - only for manipulation commands
+- If user says "change color to blue", use changeColor with shapeIds: ["selected"]
+- If user says "move to 500, 500", use moveShape with shapeId: "selected"
+- If user says "arrange horizontally", use arrangeShapes with shapeIds: ["selected"]`
+      : `\n\nNote: No shapes are currently selected. The user must either create new shapes or explicitly specify which shapes to manipulate.`;
 
     const completion = await openai.chat.completions.create({
       model: 'gpt-4o-mini', // Fast and good at function calling
@@ -376,9 +419,8 @@ Guidelines:
 - Default text size: 16px
 - Default spacing: 20px
 - Default colors: Use standard color names or hex codes
-- When user says "selected" or "all", use those special IDs
 - For complex commands (forms, navbars), use createGroup or multiple createShape calls
-- Always provide reasonable defaults for missing parameters`,
+- Always provide reasonable defaults for missing parameters${selectionContext}`,
         },
         {
           role: 'user',
@@ -404,15 +446,45 @@ Guidelines:
       });
     }
 
-    // Convert tool calls to our command format
-    const commands = toolCalls.map((toolCall) => {
+    // Convert tool calls to our command format and expand multi-select operations
+    const commands: any[] = [];
+    
+    toolCalls.forEach((toolCall) => {
       const functionName = toolCall.function.name;
       const args = JSON.parse(toolCall.function.arguments);
 
-      return {
+      // Replace "selected" with actual selected shape IDs
+      const processedArgs = { ...args };
+      
+      // Handle single shapeId parameter (moveShape, resizeShape, rotateShape)
+      if (processedArgs.shapeId === 'selected') {
+        if (selectedIds.length === 0) {
+          // No shapes selected - skip this command
+          return;
+        }
+        
+        // For operations that support single shapeId, expand to multiple commands
+        // This allows each selected shape to be moved/resized/rotated
+        selectedIds.forEach(shapeId => {
+          commands.push({
+            type: functionName,
+            ...processedArgs,
+            shapeId: shapeId,
+          });
+        });
+        return; // Don't add the original command
+      }
+      
+      // Handle shapeIds array parameter (changeColor, deleteShape, arrangeShapes, alignShapes, duplicateShape)
+      if (Array.isArray(processedArgs.shapeIds) && processedArgs.shapeIds.includes('selected')) {
+        // Replace "selected" with all selected shape IDs
+        processedArgs.shapeIds = selectedIds;
+      }
+
+      commands.push({
         type: functionName,
-        ...args,
-      };
+        ...processedArgs,
+      });
     });
 
     // ==================== Log & Return ====================

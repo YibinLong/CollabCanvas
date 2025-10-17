@@ -134,9 +134,10 @@ export function useYjsSync(
       const token = await getAuthToken()
       
       if (!token) {
-        console.error('[Yjs] ❌ No auth token available')
-        setStatus('error')
-        setError('Authentication required')
+        console.log('[Yjs] ⚠️  No auth token available - User needs to log in first')
+        console.log('[Yjs] 💡 This is normal if you just started the app. Please log in to enable real-time collaboration.')
+        setStatus('disconnected')
+        setError('Please log in to enable real-time collaboration')
         return null
       }
       
@@ -185,9 +186,18 @@ export function useYjsSync(
     })
 
     provider.on('connection-error', (err: Error) => {
-      console.error('[Yjs] Connection error:', err)
-      setStatus('error')
-      setError(err.message || 'Failed to connect to collaboration server')
+      console.error('[Yjs] ❌ Connection error:', err.message)
+      
+      // Provide helpful context based on the error
+      if (err.message.includes('401') || err.message.includes('403') || err.message.includes('auth')) {
+        console.log('[Yjs] 💡 Authentication issue detected. Your session may have expired. Try logging out and back in.')
+        setStatus('error')
+        setError('Authentication failed - please log in again')
+      } else {
+        console.log('[Yjs] 💡 Connection issue - check that the backend server is running on port 4000')
+        setStatus('error')
+        setError(err.message || 'Failed to connect to collaboration server')
+      }
     })
 
     // Set initial connecting status
@@ -343,9 +353,17 @@ export function useYjsSync(
         doc.destroy()
       }
     }).catch((error) => {
-      console.error('[Yjs] ❌ Initialization error:', error.message)
-      setStatus('error')
-      setError(error.message || 'Failed to initialize collaboration')
+      // Don't log as error if it's just missing auth token (normal on initial load)
+      if (error.message?.includes('auth') || error.message?.includes('token')) {
+        console.log('[Yjs] ⚠️  Initialization skipped - authentication required')
+        console.log('[Yjs] 💡 Please log in to enable real-time collaboration')
+        setStatus('disconnected')
+        setError('Please log in to enable real-time collaboration')
+      } else {
+        console.error('[Yjs] ❌ Initialization error:', error.message)
+        setStatus('error')
+        setError(error.message || 'Failed to initialize collaboration')
+      }
     })
 
     // Cleanup function for the effect itself

@@ -192,8 +192,9 @@ export function createWebSocketServer(
       const token = parsedUrl.searchParams.get('token')
       
       if (!token) {
-        console.log('[WS] ❌ No token - connection rejected')
-        ws.close(4401, 'Authentication required')
+        console.log('[WS] ⚠️  Connection rejected - No authentication token provided')
+        console.log('[WS] 💡 User needs to log in on the frontend first')
+        ws.close(4401, 'Authentication required - please log in')
         return
       }
 
@@ -206,8 +207,10 @@ export function createWebSocketServer(
       
       console.log(`[WS] ✅ ${user.email} authenticated`)
     } catch (error) {
-      console.error('[WS] ❌ Auth failed:', error instanceof Error ? error.message : 'Unknown error')
-      ws.close(4403, 'Invalid or expired token')
+      const errorMsg = error instanceof Error ? error.message : 'Unknown error'
+      console.log('[WS] ⚠️  Authentication failed:', errorMsg)
+      console.log('[WS] 💡 Token may be expired. User should log out and back in on the frontend.')
+      ws.close(4403, 'Invalid or expired token - please log in again')
       return
     }
 

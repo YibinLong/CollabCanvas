@@ -74,8 +74,12 @@ export async function authenticateJWT(
     });
     
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      console.log('❌ Auth failed: No token provided');
-      return res.status(401).json({ error: 'No token provided' });
+      console.log('⚠️  Auth failed: No token provided for', req.path);
+      console.log('💡 User needs to log in on the frontend to get a valid token');
+      return res.status(401).json({ 
+        error: 'No token provided',
+        message: 'Authentication required - please log in'
+      });
     }
 
     const token = authHeader.substring(7); // Remove "Bearer " prefix
@@ -92,8 +96,13 @@ export async function authenticateJWT(
     // Continue to route handler
     next();
   } catch (error) {
-    console.error('❌ Auth error:', error);
-    res.status(401).json({ error: 'Invalid or expired token' });
+    const errorMsg = error instanceof Error ? error.message : 'Unknown error';
+    console.log('⚠️  Auth failed:', errorMsg);
+    console.log('💡 Token may be expired. User should log out and back in on the frontend.');
+    res.status(401).json({ 
+      error: 'Invalid or expired token',
+      message: 'Your session has expired - please log in again'
+    });
   }
 }
 

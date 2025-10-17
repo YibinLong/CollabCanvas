@@ -186,17 +186,20 @@ export function useYjsSync(
     })
 
     provider.on('connection-error', (err: Error) => {
-      console.error('[Yjs] ❌ Connection error:', err.message)
+      console.error('[Yjs] ❌ Connection error:', err.message || err)
+      
+      // Convert error to string for safe checking
+      const errorMessage = err.message || String(err) || ''
       
       // Provide helpful context based on the error
-      if (err.message.includes('401') || err.message.includes('403') || err.message.includes('auth')) {
+      if (errorMessage.includes('401') || errorMessage.includes('403') || errorMessage.includes('auth')) {
         console.log('[Yjs] 💡 Authentication issue detected. Your session may have expired. Try logging out and back in.')
         setStatus('error')
         setError('Authentication failed - please log in again')
       } else {
         console.log('[Yjs] 💡 Connection issue - check that the backend server is running on port 4000')
         setStatus('error')
-        setError(err.message || 'Failed to connect to collaboration server')
+        setError(errorMessage || 'Failed to connect to collaboration server')
       }
     })
 

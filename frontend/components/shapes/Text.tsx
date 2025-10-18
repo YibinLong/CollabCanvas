@@ -41,6 +41,16 @@ export default function Text({ shape, isSelected, onClick, onMouseDown, onContex
   // Track if we're currently editing this text
   const [isEditing, setIsEditing] = useState(false)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+
+  const fontSize = shape.fontSize || 20
+  const fontWeight = shape.fontWeight || 500
+  const fontFamily = shape.fontFamily || 'Inter, Arial, sans-serif'
+  const paddingX = shape.paddingX ?? shape.padding ?? 8
+  const paddingY = shape.paddingY ?? shape.padding ?? 6
+  const textAlign = shape.textAlign || 'left'
+  const verticalAlign = shape.verticalAlign || 'top'
+  const lineHeight = shape.lineHeight || fontSize * 1.2
+  const showBoundingBox = shape.showBoundingBox ?? false
   
   /**
    * Handle double-click to enter edit mode
@@ -140,19 +150,20 @@ export default function Text({ shape, isSelected, onClick, onMouseDown, onContex
             width: '100%',
             height: '100%',
             border: '2px solid #0066ff',
-            borderRadius: '4px',
-            padding: '8px',
-            fontSize: `${shape.fontSize || 20}px`,
+            borderRadius: '8px',
+            padding: `${paddingY}px ${paddingX}px`,
+            fontSize: `${fontSize}px`,
             color: shape.color || '#000000',
-            fontFamily: 'Arial, sans-serif',
+            fontFamily,
+            fontWeight,
             resize: 'none',
             outline: 'none',
             backgroundColor: 'white',
             overflow: 'auto',
             // WHY: These properties ensure text wraps properly within the box
-            whiteSpace: 'pre-wrap',  // Preserves line breaks and wraps text
-            wordWrap: 'break-word',   // Breaks long words if needed
-            overflowWrap: 'break-word', // Modern alternative to word-wrap
+            whiteSpace: 'pre-wrap',
+            wordWrap: 'break-word',
+            overflowWrap: 'break-word',
           }}
           // Prevent mouse events from bubbling to canvas
           onMouseDown={(e) => e.stopPropagation()}
@@ -183,20 +194,21 @@ export default function Text({ shape, isSelected, onClick, onMouseDown, onContex
       }
     >
       {/* Text box border - shows the bounds of the text area */}
-      <rect
-        x={shape.x}
-        y={shape.y}
-        width={shape.width}
-        height={shape.height}
-        fill="white"
-        stroke={isSelected ? '#0066ff' : '#cccccc'}
-        strokeWidth={isSelected ? 2 : 1}
-        strokeDasharray={isSelected ? 'none' : '5,5'}
-        onClick={onClick}
-        onMouseDown={onMouseDown}
-        onContextMenu={onContextMenu}
-        style={{ cursor: 'pointer' }}
-      />
+      {(isSelected || showBoundingBox) && (
+        <rect
+          x={shape.x}
+          y={shape.y}
+          width={shape.width}
+          height={shape.height}
+          fill="transparent"
+          stroke={isSelected ? '#2563eb' : '#d1d5db'}
+          strokeWidth={isSelected ? 2 : 1}
+          onClick={onClick}
+          onMouseDown={onMouseDown}
+          onContextMenu={onContextMenu}
+          style={{ cursor: 'pointer' }}
+        />
+      )}
       
       {/* The actual text content - using foreignObject for proper wrapping */}
       <foreignObject
@@ -210,20 +222,25 @@ export default function Text({ shape, isSelected, onClick, onMouseDown, onContex
           style={{
             width: '100%',
             height: '100%',
-            padding: '8px',
-            fontSize: `${shape.fontSize || 20}px`,
+            padding: `${paddingY}px ${paddingX}px`,
+            fontSize: `${fontSize}px`,
             color: shape.color || '#000000',
-            fontFamily: 'Arial, sans-serif',
-            overflow: 'hidden',
-            // WHY: These properties ensure text wraps properly within the box
-            whiteSpace: 'pre-wrap',      // Preserves line breaks and wraps text
-            wordWrap: 'break-word',       // Breaks long words if needed
-            overflowWrap: 'break-word',   // Modern alternative to word-wrap
+            fontFamily,
+            fontWeight,
+            lineHeight: `${lineHeight}px`,
+            backgroundColor: 'transparent',
+            whiteSpace: 'pre-wrap',
+            wordWrap: 'break-word',
+            overflowWrap: 'break-word',
+            textAlign,
+            display: 'flex',
+            justifyContent: 'flex-start',
+            alignItems: verticalAlign === 'center' ? 'center' : verticalAlign === 'bottom' ? 'flex-end' : 'flex-start',
             cursor: 'pointer',
             userSelect: 'none',
           }}
         >
-          {shape.text}
+          <span style={{ width: '100%' }}>{shape.text}</span>
         </div>
       </foreignObject>
     </g>

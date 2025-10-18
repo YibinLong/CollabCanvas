@@ -50,10 +50,51 @@ function getDefaultDimensions(shapeType: string): { width: number; height: numbe
     case 'circle':
       return { width: 100, height: 100 };
     case 'text':
-      return { width: 200, height: 50 };
+      return { width: 200, height: 60 };
     default:
       return { width: 100, height: 100 };
   }
+}
+
+/**
+ * Estimate a text box size based on text length and font size
+ *
+ * WHY: Text shapes need explicit width/height so they don't render oversized
+ * dashed boxes. This helper gives us a reasonable bounding box that mimics
+ * Tailwind-like padding and line height.
+ */
+function calculateTextBox(
+  text: string,
+  fontSize: number,
+  options: {
+    horizontalPadding?: number;
+    verticalPadding?: number;
+    minWidth?: number;
+    maxWidth?: number;
+    lineHeightMultiplier?: number;
+  } = {}
+): { width: number; height: number } {
+  const horizontalPadding = options.horizontalPadding ?? 16; // total padding (left + right)
+  const verticalPadding = options.verticalPadding ?? 12; // total padding (top + bottom)
+  const minWidth = options.minWidth ?? fontSize * 2;
+  const maxWidth = options.maxWidth ?? Infinity;
+  const lineHeightMultiplier = options.lineHeightMultiplier ?? 1.2;
+
+  // Approximate character width (works well for sans-serif fonts)
+  const approxCharWidth = fontSize * 0.55;
+  const rawTextWidth = text.length * approxCharWidth;
+  const width = Math.min(
+    Math.max(rawTextWidth + horizontalPadding, minWidth),
+    maxWidth
+  );
+
+  const lineHeight = fontSize * lineHeightMultiplier;
+  const height = lineHeight + verticalPadding;
+
+  return {
+    width,
+    height,
+  };
 }
 
 /**
@@ -77,6 +118,8 @@ function yjsMapToObject(ymap: Y.Map<any>): Record<string, any> {
  * 
  * IMPORTANT: Shapes must be stored as Y.Map objects, not plain objects!
  * The frontend expects Y.Map and will convert them using yjsMapToObject()
+ * 
+ * @param command.zIndex - Optional explicit zIndex. If not provided, uses Date.now()
  */
 function executeCreateShape(ydoc: Y.Doc, command: any): ExecutionResult {
   try {
@@ -91,7 +134,7 @@ function executeCreateShape(ydoc: Y.Doc, command: any): ExecutionResult {
       x: command.x || 0,
       y: command.y || 0,
       color: command.color || '#000000',
-      zIndex: Date.now(), // New shapes on top
+      zIndex: command.zIndex !== undefined ? command.zIndex : Date.now(), // Use explicit zIndex if provided, otherwise Date.now()
     };
 
     // Add type-specific properties
@@ -506,7 +549,20 @@ function executeDuplicateShape(ydoc: Y.Doc, command: any): ExecutionResult {
 /**
  * Execute createGroup command (complex)
  * 
- * Creates multiple related shapes for common UI patterns
+ * WHY: Creates professionally-styled UI components with modern design patterns.
+ * These components follow current design trends with proper spacing, colors, and hierarchy.
+ * 
+ * WHAT: Creates polished UI patterns:
+ * - Button: Modern button with proper padding and visual hierarchy
+ * - Card: Professional card with border, shadow effect simulation, and structured content
+ * - Form: Complete form with labels, input fields, and submit button
+ * - Navbar: Full navigation bar with background and properly spaced items
+ * 
+ * LAYERING SYSTEM:
+ * - Uses explicit zIndex values to ensure proper stacking order
+ * - Base zIndex is current timestamp
+ * - Each shape in a group gets baseZ + offset (0, 10, 20, 30, etc.)
+ * - This ensures: shadows behind → backgrounds → borders → content → text on top
  */
 function executeCreateGroup(ydoc: Y.Doc, command: any): ExecutionResult {
   try {
@@ -514,125 +570,524 @@ function executeCreateGroup(ydoc: Y.Doc, command: any): ExecutionResult {
     const x = command.x || 100;
     const y = command.y || 100;
     const createdIds: string[] = [];
+    
+    // Base zIndex for this group - all shapes in the group will use this as starting point
+    const baseZ = Date.now();
+
+    const options = command.options || {};
 
     if (groupType === 'button') {
-      // Create a simple button (rectangle + text)
+      // ============ MODERN BUTTON ============
+      // Creates a professional-looking button with:
+      // - Rounded appearance (simulated with proper dimensions)
+      // - Primary color scheme (indigo/purple)
+      // - Proper text centering and padding
+      // - Visual depth with shadow layer
+      //
+      // LAYER ORDER (zIndex):
+      // baseZ + 0  = Shadow (bottom)
+      // baseZ + 10 = Button background (middle)
+      // baseZ + 20 = Button text (top)
+
+      const buttonLabel: string = options.label || options.text || command.label || 'Primary Action';
+      const hasIcon = Boolean(options.icon && (options.icon.symbol || options.icon.text));
+      const iconSide: 'left' | 'right' = options.icon?.position === 'right' ? 'right' : 'left';
+      const fontSize = 16;
+      const paddingX = 32;
+      const paddingY = 14;
+      const textBox = calculateTextBox(buttonLabel, fontSize, {
+        horizontalPadding: paddingX + (hasIcon ? 32 : 0),
+        verticalPadding: paddingY,
+        minWidth: 120,
+        lineHeightMultiplier: 1.25,
+      });
+      const buttonWidth = Math.max(120, Math.round(textBox.width));
+      const buttonHeight = 48;
+
+      // Clamp width for extremely long labels so it doesn't get ridiculous
+      const maxButtonWidth = options.maxWidth || 240;
+      const finalButtonWidth = Math.min(buttonWidth, maxButtonWidth);
+
+      // Shadow offset for depth
+      const shadowOffset = 4;
+      const shadowColor = options.shadowColor || '#1F2937';
+
+      // Shadow layer (creates depth effect) - BOTTOM LAYER
+      const shadowResult = executeCreateShape(ydoc, {
+        shapeType: 'rect',
+        x: x + shadowOffset,
+        y: y + shadowOffset,
+        width: finalButtonWidth,
+        height: buttonHeight,
+        color: shadowColor,
+        zIndex: baseZ + 0, // Explicit zIndex for shadow (bottom)
+      });
+      
+      // Main button background - MIDDLE LAYER
       const bgResult = executeCreateShape(ydoc, {
         shapeType: 'rect',
         x,
         y,
-        width: 120,
-        height: 40,
-        color: '#4F46E5',
+        width: finalButtonWidth,
+        height: buttonHeight,
+        color: options.backgroundColor || '#4F46E5',
+        zIndex: baseZ + 10, // Explicit zIndex for background (middle)
       });
       
+      // Button text (centered with proper padding) - TOP LAYER
       const textResult = executeCreateShape(ydoc, {
         shapeType: 'text',
-        x: x + 10,
-        y: y + 10,
-        text: 'Button',
-        fontSize: 16,
-        color: '#FFFFFF',
+        x,
+        y,
+        text: buttonLabel,
+        fontSize,
+        color: options.textColor || '#FFFFFF',
+        width: finalButtonWidth,
+        height: buttonHeight,
+        fontWeight: options.fontWeight || 600,
+        textAlign: 'center',
+        verticalAlign: 'center',
+        paddingX: hasIcon ? paddingX : paddingX / 2,
+        paddingY: paddingY / 2,
+        showBoundingBox: false,
+        zIndex: baseZ + 20, // Explicit zIndex for text (top)
       });
 
+      if (hasIcon && iconSide === 'left') {
+        const iconSize = 20;
+        const iconX = x + paddingX / 2 - iconSize;
+        const iconY = y + (buttonHeight - iconSize) / 2;
+
+        const iconText = executeCreateShape(ydoc, {
+          shapeType: 'text',
+          x: iconX,
+          y: iconY,
+          width: iconSize,
+          height: iconSize,
+          text: options.icon?.symbol || '↗',
+          fontSize: iconSize * 0.7,
+          color: options.icon?.color || '#FFFFFF',
+          textAlign: 'center',
+          verticalAlign: 'center',
+          showBoundingBox: false,
+          zIndex: baseZ + 40,
+        });
+
+        if (iconText.shapeIds) createdIds.push(...iconText.shapeIds);
+      }
+
+      if (hasIcon && iconSide === 'right') {
+        const badgeWidth = options.icon?.width || 68;
+        const badgeHeight = options.icon?.height || 28;
+        const badgeX = x + finalButtonWidth - paddingX / 2 - badgeWidth;
+        const badgeY = y + (buttonHeight - badgeHeight) / 2;
+
+        const badgeBackground = executeCreateShape(ydoc, {
+          shapeType: 'rect',
+          x: badgeX,
+          y: badgeY,
+          width: badgeWidth,
+          height: badgeHeight,
+          color: options.icon?.badgeColor || '#FACC15',
+          zIndex: baseZ + 30,
+        });
+
+        const badgeText = executeCreateShape(ydoc, {
+          shapeType: 'text',
+          x: badgeX,
+          y: badgeY,
+          width: badgeWidth,
+          height: badgeHeight,
+          text: options.icon?.text || 'Hire Me',
+          fontSize: 13,
+          fontWeight: 600,
+          color: options.icon?.badgeTextColor || '#0F172A',
+          textAlign: 'center',
+          verticalAlign: 'center',
+          showBoundingBox: false,
+          zIndex: baseZ + 40,
+        });
+
+        if (badgeBackground.shapeIds) createdIds.push(...badgeBackground.shapeIds);
+        if (badgeText.shapeIds) createdIds.push(...badgeText.shapeIds);
+      }
+
+      if (shadowResult.shapeIds) createdIds.push(...shadowResult.shapeIds);
       if (bgResult.shapeIds) createdIds.push(...bgResult.shapeIds);
       if (textResult.shapeIds) createdIds.push(...textResult.shapeIds);
 
     } else if (groupType === 'card') {
-      // Create a card (background + title + content area)
+      // ============ PROFESSIONAL CARD ============
+      // Creates a modern card component with:
+      // - White background with border
+      // - Shadow for depth
+      // - Structured content (title, description, action area)
+      // - Proper spacing and hierarchy
+      //
+      // LAYER ORDER (zIndex):
+      // baseZ + 0  = Shadow (bottom)
+      // baseZ + 5  = Border
+      // baseZ + 10 = White background
+      // baseZ + 20 = Divider line
+      // baseZ + 30 = Title text
+      // baseZ + 35 = Description text
+      // baseZ + 40 = Action button background
+      // baseZ + 50 = Action button text (top)
+      
+      // Shadow layer for depth - BOTTOM
+      const shadowResult = executeCreateShape(ydoc, {
+        shapeType: 'rect',
+        x: x + 3,
+        y: y + 3,
+        width: 328,
+        height: 248,
+        color: '#E2E8F0', // Extra light shadow
+        zIndex: baseZ + 0,
+      });
+      
+      // Border layer (simulates border)
+      const borderResult = executeCreateShape(ydoc, {
+        shapeType: 'rect',
+        x: x,
+        y: y,
+        width: 320,
+        height: 240,
+        color: '#E2E8F0', // Light gray border
+        zIndex: baseZ + 5,
+      });
+      
+      // Main white background
       const bgResult = executeCreateShape(ydoc, {
         shapeType: 'rect',
         x,
         y,
-        width: 250,
-        height: 150,
+        width: 320,
+        height: 240,
         color: '#FFFFFF',
+        zIndex: baseZ + 10,
       });
 
+      // Divider line
+      const dividerResult = executeCreateShape(ydoc, {
+        shapeType: 'line',
+        x: x + 24,
+        y: y + 160,
+        x2: x + 296,
+        y2: y + 160,
+        color: '#E2E8F0',
+        strokeWidth: 1,
+        zIndex: baseZ + 20,
+      });
+
+      // Card title (bold, large)
       const titleResult = executeCreateShape(ydoc, {
         shapeType: 'text',
-        x: x + 20,
-        y: y + 20,
+        x: x + 24,
+        y: y + 24,
         text: 'Card Title',
-        fontSize: 18,
-        color: '#000000',
+        fontSize: 22,
+        color: '#0F172A', // Very dark gray/black
+        zIndex: baseZ + 30,
+      });
+      
+      // Card description
+      const descResult = executeCreateShape(ydoc, {
+        shapeType: 'text',
+        x: x + 24,
+        y: y + 60,
+        text: 'This is a description that lives inside the card.',
+        fontSize: 14,
+        color: '#64748B', // Medium gray
+        width: 272,
+        height: 48,
+        zIndex: baseZ + 35,
+      });
+      
+      // Action button in card
+      const actionBgResult = executeCreateShape(ydoc, {
+        shapeType: 'rect',
+        x: x + 24,
+        y: y + 182,
+        width: 100,
+        height: 38,
+        color: '#3B82F6', // Blue
+        zIndex: baseZ + 40,
+      });
+      
+      const actionTextResult = executeCreateShape(ydoc, {
+        shapeType: 'text',
+        x: x + 46,
+        y: y + 194,
+        text: 'Learn More',
+        fontSize: 14,
+        color: '#FFFFFF',
+        zIndex: baseZ + 50,
       });
 
+      if (shadowResult.shapeIds) createdIds.push(...shadowResult.shapeIds);
+      if (borderResult.shapeIds) createdIds.push(...borderResult.shapeIds);
       if (bgResult.shapeIds) createdIds.push(...bgResult.shapeIds);
+      if (dividerResult.shapeIds) createdIds.push(...dividerResult.shapeIds);
       if (titleResult.shapeIds) createdIds.push(...titleResult.shapeIds);
+      if (descResult.shapeIds) createdIds.push(...descResult.shapeIds);
+      if (actionBgResult.shapeIds) createdIds.push(...actionBgResult.shapeIds);
+      if (actionTextResult.shapeIds) createdIds.push(...actionTextResult.shapeIds);
 
     } else if (groupType === 'form') {
-      // Create a simple form layout
-      const fields = ['Username', 'Password'];
-      let currentY = y;
+      // ============ LOGIN FORM ============
+      // Creates a complete, professional login form with:
+      // - Form container with border
+      // - Two input fields (Username, Password)
+      // - Modern input styling with borders
+      // - Professional submit button
+      // - Proper spacing and alignment
+      //
+      // LAYER ORDER (zIndex):
+      // baseZ + 0   = Form container (bottom)
+      // baseZ + 10  = Form title
+      // baseZ + 20  = Field borders
+      // baseZ + 30  = Field backgrounds
+      // baseZ + 40  = Field labels and placeholders
+      // baseZ + 100 = Button shadow
+      // baseZ + 110 = Button background
+      // baseZ + 120 = Button text (top)
+      
+      // Form container background - BOTTOM
+      const containerResult = executeCreateShape(ydoc, {
+        shapeType: 'rect',
+        x: x - 10,
+        y: y - 10,
+        width: 340,
+        height: 320,
+        color: '#F8FAFC', // Very light gray background
+        zIndex: baseZ + 0,
+      });
+      
+      // Form title
+      const titleResult = executeCreateShape(ydoc, {
+        shapeType: 'text',
+        x: x + 80,
+        y: y + 10,
+        text: 'Login Form',
+        fontSize: 24,
+        color: '#0F172A',
+        zIndex: baseZ + 10,
+      });
 
-      fields.forEach((label, index) => {
-        // Label
-        const labelResult = executeCreateShape(ydoc, {
-          shapeType: 'text',
-          x: x,
-          y: currentY,
-          text: label,
-          fontSize: 14,
-          color: '#000000',
+      const fields = [
+        { label: 'Username', placeholder: 'Enter username' },
+        { label: 'Password', placeholder: '••••••••' }
+      ];
+      let currentY = y + 60;
+
+      fields.forEach((field, index) => {
+        // Input field border (darker to simulate border)
+        const borderResult = executeCreateShape(ydoc, {
+          shapeType: 'rect',
+          x: x - 1,
+          y: currentY + 24,
+          width: 302,
+          height: 42,
+          color: '#CBD5E1', // Border color
+          zIndex: baseZ + 20,
         });
-
-        // Input field
+        
+        // Input field background
         const inputResult = executeCreateShape(ydoc, {
           shapeType: 'rect',
           x,
           y: currentY + 25,
-          width: 200,
-          height: 30,
-          color: '#F3F4F6',
+          width: 300,
+          height: 40,
+          color: '#FFFFFF', // White background
+          zIndex: baseZ + 30,
+        });
+        
+        // Field label
+        const labelResult = executeCreateShape(ydoc, {
+          shapeType: 'text',
+          x: x,
+          y: currentY,
+          text: field.label,
+          fontSize: 14,
+          color: '#334155', // Dark gray
+          zIndex: baseZ + 40,
+        });
+        
+        // Placeholder text
+        const placeholderResult = executeCreateShape(ydoc, {
+          shapeType: 'text',
+          x: x + 12,
+          y: currentY + 37,
+          text: field.placeholder,
+          fontSize: 14,
+          color: '#94A3B8', // Light gray for placeholder
+          zIndex: baseZ + 40,
         });
 
-        if (labelResult.shapeIds) createdIds.push(...labelResult.shapeIds);
+        if (borderResult.shapeIds) createdIds.push(...borderResult.shapeIds);
         if (inputResult.shapeIds) createdIds.push(...inputResult.shapeIds);
+        if (labelResult.shapeIds) createdIds.push(...labelResult.shapeIds);
+        if (placeholderResult.shapeIds) createdIds.push(...placeholderResult.shapeIds);
 
-        currentY += 75;
+        currentY += 90;
       });
 
-      // Submit button
+      // Submit button shadow
+      const btnShadowResult = executeCreateShape(ydoc, {
+        shapeType: 'rect',
+        x: x + 2,
+        y: currentY + 12,
+        width: 300,
+        height: 46,
+        color: '#0F766E', // Darker teal for shadow
+        zIndex: baseZ + 100,
+      });
+      
+      // Submit button background
       const buttonResult = executeCreateShape(ydoc, {
         shapeType: 'rect',
         x,
-        y: currentY,
-        width: 100,
-        height: 35,
-        color: '#10B981',
+        y: currentY + 10,
+        width: 300,
+        height: 46,
+        color: '#14B8A6', // Teal/cyan color
+        zIndex: baseZ + 110,
       });
 
+      // Submit button text (centered)
       const buttonTextResult = executeCreateShape(ydoc, {
         shapeType: 'text',
-        x: x + 20,
-        y: currentY + 8,
-        text: 'Submit',
+        x: x + 110,
+        y: currentY + 24,
+        text: 'Login',
         fontSize: 16,
         color: '#FFFFFF',
+        zIndex: baseZ + 120,
       });
 
+      if (containerResult.shapeIds) createdIds.push(...containerResult.shapeIds);
+      if (titleResult.shapeIds) createdIds.push(...titleResult.shapeIds);
+      if (btnShadowResult.shapeIds) createdIds.push(...btnShadowResult.shapeIds);
       if (buttonResult.shapeIds) createdIds.push(...buttonResult.shapeIds);
       if (buttonTextResult.shapeIds) createdIds.push(...buttonTextResult.shapeIds);
 
     } else if (groupType === 'navbar') {
-      // Create a navigation bar
-      const items = ['Home', 'About', 'Services', 'Contact'];
-      let currentX = x;
+      // ============ MODERN NAVBAR ============
+      // Creates a professional navigation bar with:
+      // - Full-width background bar
+      // - Logo/brand text
+      // - Multiple navigation items
+      // - Visual separation
+      // - Modern color scheme
+      //
+      // LAYER ORDER (zIndex):
+      // baseZ + 0  = Navbar background (bottom)
+      // baseZ + 10 = Separator line
+      // baseZ + 20 = Active indicators
+      // baseZ + 30 = Logo and nav text
+      // baseZ + 40 = Action button background
+      // baseZ + 50 = Action button text (top)
+      
+      // Navbar background bar - BOTTOM
+      const bgResult = executeCreateShape(ydoc, {
+        shapeType: 'rect',
+        x: x - 20,
+        y: y - 10,
+        width: 800,
+        height: 60,
+        color: '#1E293B', // Dark slate background
+        zIndex: baseZ + 0,
+      });
+      
+      // Separator line after logo
+      const separatorResult = executeCreateShape(ydoc, {
+        shapeType: 'line',
+        x: x + 90,
+        y: y - 5,
+        x2: x + 90,
+        y2: y + 45,
+        color: '#475569',
+        strokeWidth: 2,
+        zIndex: baseZ + 10,
+      });
+
+      // Navigation items
+      const items = [
+        { text: 'Home', active: true },
+        { text: 'Products', active: false },
+        { text: 'About', active: false },
+        { text: 'Contact', active: false }
+      ];
+      let currentX = x + 130;
 
       items.forEach((item) => {
+        // Active indicator (only for active item)
+        if (item.active) {
+          const activeIndicatorResult = executeCreateShape(ydoc, {
+            shapeType: 'rect',
+            x: currentX - 5,
+            y: y - 8,
+            width: 70,
+            height: 4,
+            color: '#3B82F6', // Blue indicator
+            zIndex: baseZ + 20,
+          });
+          if (activeIndicatorResult.shapeIds) createdIds.push(...activeIndicatorResult.shapeIds);
+        }
+        
+        // Navigation text
         const textResult = executeCreateShape(ydoc, {
           shapeType: 'text',
           x: currentX,
-          y: y,
-          text: item,
-          fontSize: 16,
-          color: '#000000',
+          y: y + 10,
+          text: item.text,
+          fontSize: 15,
+          color: item.active ? '#FFFFFF' : '#94A3B8', // White for active, gray for inactive
+          zIndex: baseZ + 30,
         });
 
         if (textResult.shapeIds) createdIds.push(...textResult.shapeIds);
-        currentX += 100;
+        currentX += 120;
       });
+      
+      // Brand/Logo text
+      const logoResult = executeCreateShape(ydoc, {
+        shapeType: 'text',
+        x: x,
+        y: y + 10,
+        text: 'Brand',
+        fontSize: 20,
+        color: '#FFFFFF',
+        zIndex: baseZ + 30,
+      });
+      
+      // Action button (e.g., "Sign In")
+      const actionBtnBg = executeCreateShape(ydoc, {
+        shapeType: 'rect',
+        x: x + 640,
+        y: y,
+        width: 90,
+        height: 36,
+        color: '#3B82F6', // Blue
+        zIndex: baseZ + 40,
+      });
+      
+      const actionBtnText = executeCreateShape(ydoc, {
+        shapeType: 'text',
+        x: x + 660,
+        y: y + 11,
+        text: 'Sign In',
+        fontSize: 14,
+        color: '#FFFFFF',
+        zIndex: baseZ + 50,
+      });
+
+      if (bgResult.shapeIds) createdIds.push(...bgResult.shapeIds);
+      if (separatorResult.shapeIds) createdIds.push(...separatorResult.shapeIds);
+      if (logoResult.shapeIds) createdIds.push(...logoResult.shapeIds);
+      if (actionBtnBg.shapeIds) createdIds.push(...actionBtnBg.shapeIds);
+      if (actionBtnText.shapeIds) createdIds.push(...actionBtnText.shapeIds);
     }
 
     return {

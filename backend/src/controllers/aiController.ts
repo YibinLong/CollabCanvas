@@ -420,7 +420,21 @@ Guidelines:
 - Default spacing: 20px
 - Default colors: Use standard color names or hex codes
 - For complex commands (forms, navbars), use createGroup or multiple createShape calls
-- Always provide reasonable defaults for missing parameters${selectionContext}`,
+- Always provide reasonable defaults for missing parameters
+
+COMPLEX UI COMPONENTS (use createGroup):
+When users ask to create buttons, cards, forms, or navbars, use the createGroup function.
+These will automatically create professional, modern-styled components with:
+- Button: Modern button with shadow, proper padding, and centered text
+- Card: Professional card with border, shadow, title, description, and action button
+- Form: Complete login form with container, labels, input fields, and submit button  
+- Navbar: Full navigation bar with background, logo, navigation items, and action button
+
+Examples:
+- "create a button" → createGroup({ groupType: "button", x: 200, y: 200 })
+- "make a card" → createGroup({ groupType: "card", x: 300, y: 300 })
+- "design a login form" → createGroup({ groupType: "form", x: 100, y: 100 })
+- "build a navbar" → createGroup({ groupType: "navbar", x: 100, y: 50 })${selectionContext}`,
         },
         {
           role: 'user',

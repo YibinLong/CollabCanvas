@@ -44,7 +44,7 @@ export default function AIAssistant({ documentId, onCommandExecuted }: AIAssista
 
 I can help you design faster with 10 powerful tools:
 
-🎨 CREATE
+🎨 CREATE SHAPES
 • "Create a red rectangle at 200, 200"
 • "Add a blue circle at 300, 300"
 • "Draw a line from 100, 100 to 400, 400"
@@ -70,11 +70,13 @@ I can help you design faster with 10 powerful tools:
 • "Duplicate selected shapes"
 • "Copy this shape with 50px offset"
 
-🎯 COMPLEX GROUPS
-• "Create a button at 200, 200"
-• "Make a card at 300, 300"
-• "Design a login form at 100, 100"
-• "Build a navbar at 100, 50"
+✨ PROFESSIONAL UI COMPONENTS (NEW!)
+Create modern, polished components instantly:
+
+• 🔘 "Create a button" → Modern button with shadow & styling
+• 🃏 "Make a card" → Professional card with border, title & CTA
+• 📋 "Design a login form" → Complete form with inputs & button
+• 🧭 "Build a navbar" → Full navigation bar with logo & items
 
 Just type what you want to create!`,
       timestamp: Date.now(),
@@ -196,7 +198,7 @@ Just type what you want to create!`,
   /**
    * Quick action buttons for common commands
    * WHY: These provide one-click examples of every AI tool category
-   * WHAT: 12 buttons covering all 10 tools in a professional, Figma-like layout
+   * WHAT: 16 buttons covering all 10 tools + professional UI components in a Figma-like layout
    */
   const quickActions = [
     // CREATE tools (4 shape types)
@@ -219,9 +221,9 @@ Just type what you want to create!`,
     { label: '📋 Duplicate', prompt: 'Duplicate selected shapes' },
     { label: '🗑️ Delete', prompt: 'Delete selected shapes' },
     
-    // COMPLEX GROUP tools
-    { label: '🎯 Button', prompt: 'Create a button at 200, 200' },
-    { label: '🃏 Card', prompt: 'Create a card at 300, 300' },
+    // PROFESSIONAL UI COMPONENTS (improved!)
+    { label: '✨ Button', prompt: 'Create a button at 200, 200 with text Primary Action' },
+    { label: '🃏 Card', prompt: 'Create a modern card at 300, 300' },
     { label: '📋 Form', prompt: 'Design a login form at 100, 100' },
     { label: '🧭 Navbar', prompt: 'Build a navbar at 100, 50' },
   ];

@@ -30,6 +30,8 @@ export interface RectangleShape extends BaseShape {
   width: number;
   height: number;
   color?: string;
+  // Canvas currently renders rectangles as plain SVG <rect> without radius support.
+  // If you need rounded rectangles, consider using a separate shape type.
 }
 
 // Circle shape
@@ -60,6 +62,16 @@ export interface TextShape extends BaseShape {
   color?: string;
   width: number;  // Width of the text box (for editing and resizing)
   height: number; // Height of the text box (for editing and resizing)
+  fontWeight?: number | string;
+  fontStyle?: 'normal' | 'italic';
+  fontFamily?: string;
+  lineHeight?: number;
+  padding?: number;
+  paddingX?: number;
+  paddingY?: number;
+  textAlign?: 'left' | 'center' | 'right';
+  verticalAlign?: 'top' | 'center' | 'bottom';
+  showBoundingBox?: boolean;
 }
 
 // Union type for all shapes

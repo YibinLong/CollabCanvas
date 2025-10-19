@@ -15,6 +15,7 @@ import { Request, Response } from 'express';
 import { aiController } from './aiController';
 import { executeAICommands } from '../services/aiCanvasOperations';
 import { getYjsDocumentForRoom } from '../services/websocketServer';
+import { formatAIResponse } from '../utils/aiResponseFormatter';
 
 /**
  * Execute AI command on canvas
@@ -119,13 +120,16 @@ export const executeCommand = async (req: Request, res: Response) => {
       console.log(`  Errors: ${errors.length}`);
     }
 
+    // Generate a natural, user-friendly description of what was done
+    const naturalMessage = formatAIResponse(commands, allShapeIds);
+
     // Step 4: Return success (Yjs automatically syncs to all clients via WebSocket)
     return res.status(200).json({
       success: true,
       commands: commands.length,
       shapeIds: allShapeIds,
       errors: errors.length > 0 ? errors : undefined,
-      message: `Executed ${commands.length} command(s), affected ${allShapeIds.length} shape(s)`,
+      message: naturalMessage,
       interpretTimeMs: interpretResult.data.executionTimeMs,
     });
 

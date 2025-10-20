@@ -306,7 +306,9 @@ function getGroupDescription(cmd: AICommand): string {
   switch (groupType) {
     case 'button':
       const buttonText = cmd.metadata?.text || 'button';
-      return `a ${buttonText} button`;
+      // If the button text is the default "button", just say "a button"
+      // Otherwise say "a [text] button" (e.g., "a Submit button")
+      return buttonText.toLowerCase() === 'button' ? 'a button' : `a ${buttonText} button`;
     
     case 'card':
       return 'a professional card component';

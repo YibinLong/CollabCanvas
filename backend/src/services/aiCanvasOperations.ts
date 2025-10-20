@@ -458,36 +458,56 @@ function executeAlignShapes(ydoc: Y.Doc, command: any): ExecutionResult {
     const alignedIds: string[] = [];
     
     // Get all shapes and find bounds
-    const shapeData: Array<{ id: string; ymap: Y.Map<any>; x: number; y: number; width: number; height: number }> = [];
+    const shapeData: Array<{ id: string; ymap: Y.Map<any>; type: string; x: number; y: number; width: number; height: number }> = [];
     let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
 
     shapeIds.forEach((shapeId: string) => {
       if (shapes.has(shapeId)) {
         const yjsShape = shapes.get(shapeId) as Y.Map<any>;
+        const type = yjsShape.get('type') || 'rect';
         const x = yjsShape.get('x') || 0;
         const y = yjsShape.get('y') || 0;
         const width = yjsShape.get('width') || 0;
         const height = yjsShape.get('height') || 0;
         
-        shapeData.push({ id: shapeId, ymap: yjsShape, x, y, width, height });
+        shapeData.push({ id: shapeId, ymap: yjsShape, type, x, y, width, height });
 
+        // Calculate bounds correctly based on shape type
         minX = Math.min(minX, x);
-        maxX = Math.max(maxX, x + width);
         minY = Math.min(minY, y);
-        maxY = Math.max(maxY, y + height);
+        
+        // For right/bottom bounds, only add width/height for rect, circle, text (not lines)
+        if (type === 'rect' || type === 'circle' || type === 'text') {
+          maxX = Math.max(maxX, x + width);
+          maxY = Math.max(maxY, y + height);
+        } else {
+          // For lines, just use x, y as the max
+          maxX = Math.max(maxX, x);
+          maxY = Math.max(maxY, y);
+        }
       }
     });
 
     // Apply alignment
-    shapeData.forEach(({ id, ymap, width, height }) => {
+    shapeData.forEach(({ id, ymap, type, width, height }) => {
       if (alignment === 'left') {
         ymap.set('x', minX);
       } else if (alignment === 'right') {
-        ymap.set('x', maxX - width);
+        // Only subtract width for shapes that have it
+        if (type === 'rect' || type === 'circle' || type === 'text') {
+          ymap.set('x', maxX - width);
+        } else {
+          ymap.set('x', maxX);
+        }
       } else if (alignment === 'top') {
         ymap.set('y', minY);
       } else if (alignment === 'bottom') {
-        ymap.set('y', maxY - height);
+        // Only subtract height for shapes that have it
+        if (type === 'rect' || type === 'circle' || type === 'text') {
+          ymap.set('y', maxY - height);
+        } else {
+          ymap.set('y', maxY);
+        }
       } else if (alignment === 'center-horizontal') {
         const centerX = (minX + maxX) / 2;
         ymap.set('x', centerX - width / 2);
@@ -545,6 +565,10 @@ function executeDuplicateShape(ydoc: Y.Doc, command: any): ExecutionResult {
           newYjsShape.set('x2', (originalYjsShape.get('x2') || 0) + offsetX);
           newYjsShape.set('y2', (originalYjsShape.get('y2') || 0) + offsetY);
         }
+
+        // Clear lock states (duplicates should not inherit locks)
+        newYjsShape.set('lockedBy', null);
+        newYjsShape.set('lockedAt', null);
 
         shapes.set(newShapeId, newYjsShape);
         duplicatedIds.push(newShapeId);

@@ -146,10 +146,28 @@ function executeCreateShape(ydoc: Y.Doc, command: any): ExecutionResult {
       shapeData.y2 = command.y2 || (command.y + 100);
       shapeData.strokeWidth = command.strokeWidth || 2;
     } else if (command.shapeType === 'text') {
+      // Basic text properties
       shapeData.text = command.text || 'Text';
       shapeData.fontSize = command.fontSize || 16;
       shapeData.width = command.width || defaults.width;
       shapeData.height = command.height || defaults.height;
+      
+      // Advanced text properties for alignment and styling
+      // WHY: These properties allow proper text centering, padding, and formatting
+      // They're essential for complex components like buttons and cards
+      if (command.textAlign !== undefined) shapeData.textAlign = command.textAlign;
+      if (command.verticalAlign !== undefined) shapeData.verticalAlign = command.verticalAlign;
+      if (command.paddingX !== undefined) shapeData.paddingX = command.paddingX;
+      if (command.paddingY !== undefined) shapeData.paddingY = command.paddingY;
+      if (command.fontWeight !== undefined) shapeData.fontWeight = command.fontWeight;
+      if (command.fontStyle !== undefined) shapeData.fontStyle = command.fontStyle;
+      if (command.fontFamily !== undefined) shapeData.fontFamily = command.fontFamily;
+      if (command.lineHeight !== undefined) shapeData.lineHeight = command.lineHeight;
+      
+      // Default to no bounding box for cleaner appearance
+      // WHY: AI-created text should look clean without visible borders by default
+      // Users can still see/select the text, they just won't see an ugly box around it
+      shapeData.showBoundingBox = command.showBoundingBox !== undefined ? command.showBoundingBox : false;
     }
 
     if (command.rotation) {
@@ -814,13 +832,20 @@ function executeCreateGroup(ydoc: Y.Doc, command: any): ExecutionResult {
         zIndex: baseZ + 40,
       });
       
+      // WHY: Use textAlign and verticalAlign for proper centering instead of hard-coded offsets
+      // This ensures text is perfectly centered regardless of button size or text length
       const actionTextResult = executeCreateShape(ydoc, {
         shapeType: 'text',
-        x: x + 46,
-        y: y + 194,
+        x: x + 24,
+        y: y + 182,
+        width: 100,
+        height: 38,
         text: 'Learn More',
         fontSize: 14,
         color: '#FFFFFF',
+        textAlign: 'center',
+        verticalAlign: 'center',
+        showBoundingBox: false,
         zIndex: baseZ + 50,
       });
 
@@ -915,13 +940,20 @@ function executeCreateGroup(ydoc: Y.Doc, command: any): ExecutionResult {
         });
         
         // Placeholder text
+        // WHY: Use textAlign and verticalAlign for proper centering within the input field
         const placeholderResult = executeCreateShape(ydoc, {
           shapeType: 'text',
-          x: x + 12,
-          y: currentY + 37,
+          x: x,
+          y: currentY + 25,
+          width: 300,
+          height: 40,
           text: field.placeholder,
           fontSize: 14,
           color: '#94A3B8', // Light gray for placeholder
+          textAlign: 'left',
+          verticalAlign: 'center',
+          paddingX: 12,
+          showBoundingBox: false,
           zIndex: baseZ + 40,
         });
 
@@ -956,13 +988,19 @@ function executeCreateGroup(ydoc: Y.Doc, command: any): ExecutionResult {
       });
 
       // Submit button text (centered)
+      // WHY: Use textAlign and verticalAlign for proper centering instead of hard-coded offsets
       const buttonTextResult = executeCreateShape(ydoc, {
         shapeType: 'text',
-        x: x + 110,
-        y: currentY + 24,
+        x: x,
+        y: currentY + 10,
+        width: 300,
+        height: 46,
         text: 'Login',
         fontSize: 16,
         color: '#FFFFFF',
+        textAlign: 'center',
+        verticalAlign: 'center',
+        showBoundingBox: false,
         zIndex: baseZ + 120,
       });
 
@@ -1073,13 +1111,20 @@ function executeCreateGroup(ydoc: Y.Doc, command: any): ExecutionResult {
         zIndex: baseZ + 40,
       });
       
+      // WHY: Use textAlign and verticalAlign for proper centering instead of hard-coded offsets
+      // This ensures text is perfectly centered in the button
       const actionBtnText = executeCreateShape(ydoc, {
         shapeType: 'text',
-        x: x + 660,
-        y: y + 11,
+        x: x + 640,
+        y: y,
+        width: 90,
+        height: 36,
         text: 'Sign In',
         fontSize: 14,
         color: '#FFFFFF',
+        textAlign: 'center',
+        verticalAlign: 'center',
+        showBoundingBox: false,
         zIndex: baseZ + 50,
       });
 

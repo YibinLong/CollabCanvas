@@ -193,22 +193,35 @@ export default function Text({ shape, isSelected, onClick, onMouseDown, onContex
           : undefined
       }
     >
-      {/* Text box border - shows the bounds of the text area */}
-      {(isSelected || showBoundingBox) && (
-        <rect
-          x={shape.x}
-          y={shape.y}
-          width={shape.width}
-          height={shape.height}
-          fill="transparent"
-          stroke={isSelected ? '#2563eb' : '#d1d5db'}
-          strokeWidth={isSelected ? 2 : 1}
-          onClick={onClick}
-          onMouseDown={onMouseDown}
-          onContextMenu={onContextMenu}
-          style={{ cursor: 'pointer' }}
-        />
-      )}
+      {/* Text box border - ALWAYS rendered for click handling
+          WHY: This rect must ALWAYS exist so text is clickable/selectable.
+          Previously it was conditionally rendered, making text unclickable when
+          not selected and showBoundingBox=false. This broke AI-created text!
+          
+          HOW: Always render the rect, but make it invisible when needed:
+          - When selected: blue border (visible)
+          - When showBoundingBox=true: gray border (visible) 
+          - Otherwise: transparent stroke with 0 width (invisible but clickable)
+      */}
+      <rect
+        x={shape.x}
+        y={shape.y}
+        width={shape.width}
+        height={shape.height}
+        fill="transparent"
+        stroke={
+          isSelected 
+            ? '#2563eb'  // Blue border when selected
+            : showBoundingBox 
+              ? '#d1d5db'  // Gray border when showBoundingBox=true
+              : 'transparent'  // Invisible but still clickable when neither
+        }
+        strokeWidth={isSelected ? 2 : showBoundingBox ? 1 : 0}
+        onClick={onClick}
+        onMouseDown={onMouseDown}
+        onContextMenu={onContextMenu}
+        style={{ cursor: 'pointer' }}
+      />
       
       {/* The actual text content - using foreignObject for proper wrapping */}
       <foreignObject

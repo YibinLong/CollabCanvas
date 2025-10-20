@@ -305,7 +305,25 @@ const functions: OpenAI.Chat.Completions.ChatCompletionTool[] = [
           },
           options: {
             type: 'object',
-            description: 'Group-specific options (e.g., for a form: fields array, for navbar: items array)',
+            description: 'Group-specific options. For buttons: { label: "text", backgroundColor: "color", textColor: "color", shadowColor: "color" }. For forms: fields array. For navbars: items array.',
+            properties: {
+              label: {
+                type: 'string',
+                description: 'Button text label (for button group type)',
+              },
+              backgroundColor: {
+                type: 'string',
+                description: 'Background color for button (for button group type). Accepts color names (red, blue, maroon) or hex codes (#FF0000)',
+              },
+              textColor: {
+                type: 'string',
+                description: 'Text color for button (for button group type). Accepts color names or hex codes',
+              },
+              shadowColor: {
+                type: 'string',
+                description: 'Shadow color for button (for button group type). Accepts color names or hex codes',
+              },
+            },
           },
         },
         required: ['groupType', 'x', 'y'],
@@ -430,8 +448,23 @@ These will automatically create professional, modern-styled components with:
 - Form: Complete login form with container, labels, input fields, and submit button  
 - Navbar: Full navigation bar with background, logo, navigation items, and action button
 
+IMPORTANT - Button Customization:
+When users specify button properties, pass them in the options object:
+
+Text Customization:
+- "create a button with text Hello" → createGroup({ groupType: "button", x: 200, y: 200, options: { label: "Hello" } })
+- "make a button that says Submit" → createGroup({ groupType: "button", x: 150, y: 150, options: { label: "Submit" } })
+
+Color Customization (supports color names and hex codes):
+- "create a red button" → createGroup({ groupType: "button", x: 200, y: 200, options: { backgroundColor: "red" } })
+- "make a blue button with text Go" → createGroup({ groupType: "button", x: 150, y: 150, options: { label: "Go", backgroundColor: "blue" } })
+- "create a maroon button" → createGroup({ groupType: "button", x: 100, y: 100, options: { backgroundColor: "maroon" } })
+- "make a green button with white text" → createGroup({ groupType: "button", x: 100, y: 100, options: { backgroundColor: "green", textColor: "white" } })
+- "create a button with color #FF5733" → createGroup({ groupType: "button", x: 200, y: 200, options: { backgroundColor: "#FF5733" } })
+
 Examples:
 - "create a button" → createGroup({ groupType: "button", x: 200, y: 200 })
+- "create a red button at 200, 200" → createGroup({ groupType: "button", x: 200, y: 200, options: { backgroundColor: "red" } })
 - "make a card" → createGroup({ groupType: "card", x: 300, y: 300 })
 - "design a login form" → createGroup({ groupType: "form", x: 100, y: 100 })
 - "build a navbar" → createGroup({ groupType: "navbar", x: 100, y: 50 })${selectionContext}`,

@@ -1,5 +1,7 @@
 # CollabCanvas - Figma Clone
 
+![Demo](assets/demo.gif)
+
 > A real-time collaborative design tool inspired by Figma.
 
 CollabCanvas allows multiple users to create and edit vector shapes together in real-time, with each user's cursor visible to others. Built with modern web technologies, it features persistent storage, authentication, and advanced editing tools like keyboard shortcuts and shape alignment.
